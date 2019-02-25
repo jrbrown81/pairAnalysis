@@ -1,0 +1,58 @@
+printOutSetupFileParameters = 0
+
+spectrumName = Na-22
+pathRoot_in_calib = /home/gate/work/setup
+fname_pixel_mapping_file = LISA_QET_pixel_map_config
+TcalibFileName = timingCalib_400ns_60mV_2us
+
+prntOutF = 1000
+
+firstPixel = 1
+lastPixel = 968
+nPixXY = 22
+nAMs = 2
+
+minE = 0
+maxE = 560
+nBinsE = 280
+minEcath = 0
+maxEcath = 640
+nBinsEcath = 320
+minPhotopeakE4PeakSearch = 460
+maxPhotopeakE4PeakSearch = 550
+
+minNTrigs4H = 0
+maxNTrigs4H = 10
+minNTrigs4H_2D = 0
+maxNTrigs4H_2D = 6
+minClusterSize4H = 0
+maxClusterSize4H = 8
+
+Na22Energy = 511
+// all angles are in degrees
+angleOfSecondHead = 0
+relativePhiAngle = 90
+EwindowFor4PhiAnalyis_min = 460
+EwindowFor4PhiAnalyis_max = 520
+//ThetaWindowFor4PhiAnalyis_min = 60
+//ThetaWindowFor4PhiAnalyis_max = 90
+ThetaWindowFor4PhiAnalyis_min = 20
+ThetaWindowFor4PhiAnalyis_max = 175
+
+makeTimingStuff = 1
+
+// 0 - all, 1 - fully internal (disable two most external rows), 2 - internal (disable one external row), 3 - NOT fully internal, 4 - NOT internal
+typeOfPixelsToUse = 0
+
+nBins_dPhi = 36
+nBinsTheta4H = 18
+// In pixels
+maxDistanceBetweenClusters4ComptonPair = 7
+
+// Cluster reconstruction stuff
+maxClusterSize = 10
+minPixelEnergyThr4ClusterReconstruction = 15
+neighbourSearchWindow = 1
+maxClusterSizeToSkipFrame = 25
+useOnlyTriggeredPixelsInCluster = 0
+
