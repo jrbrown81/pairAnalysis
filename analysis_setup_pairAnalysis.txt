@@ -1,7 +1,8 @@
+// v8
 printOutSetupFileParameters = 0
 
 spectrumName = Na-22, 1400V
-pathRoot_in_calib = /home/gate/work/setup
+pathRoot_in_calib = /home/gate/qnap/GATE/QET/setup
 fname_pixel_mapping_file = LISA_QET_pixel_map_config
 TcalibFileName = timingCalib_400ns_60mV_2us
 
@@ -13,8 +14,12 @@ firstPixel = 1
 lastPixel = 968
 nPixXY = 22
 nAMs = 2
+usePixelListToDisable = 1
+pixelListFileName = pixel_list.txt
+saveSelectedComptonRootTree = 0
+// 1 - just requiring 2 clusters per head, 2 - with cluster specific selections
+savingPointLocation = 1
 
-// Ranges for spectra
 minE = 0
 maxE = 580
 nBinsE = 290
@@ -23,6 +28,7 @@ maxEcath = 640
 nBinsEcath = 320
 minPhotopeakE4PeakSearch = 460
 maxPhotopeakE4PeakSearch = 550
+plotPixelClusterSpectra = 0
 
 enableEventMonitor = 0
 // if nEvents2Display = -1, then display all events
@@ -41,10 +47,12 @@ Na22Energy = 511
 angleOfSecondHead = 0
 relativePhiAngle = 90
 EwindowFor4PhiAnalyis_min = 480
-EwindowFor4PhiAnalyis_max = 530
-ThetaWindowFor4PhiAnalyis_min = 70
-ThetaWindowFor4PhiAnalyis_max = 95
+EwindowFor4PhiAnalyis_max = 540
+ThetaWindowFor4PhiAnalyis_min = 74
+ThetaWindowFor4PhiAnalyis_max = 90
 makeCosineFit = 0
+// ns/mm, approximate for 1400V, 600 ns per 5 mm
+factor2ConvertAnodeTime2Distance = 120
 
 makeRawTimingStuff = 0
 minRawTiming4H = 0
@@ -76,10 +84,18 @@ minPixelEnergyThr4ClusterReconstruction = 30
 neighbourSearchWindow = 1
 doNotUseCornerTouchingPixels4Clustering = 1
 maxClusterSizeToSkipFrame = 25
-useOnlyTriggeredPixelsInCluster = 0
+useOnlyTriggeredPixelsInCluster = 1
 
 // if either of those is -1, then all cluster sizes are analysed
 minClusterSize4PairAnalysis = -1
-maxClusterSize4PairAnalysis = 10
+maxClusterSize4PairAnalysis = 2
 updateSinglePixelClusterCOGEneg = 1
 updateTwoPixelClusterCOGEneg = 1
+updateTwoPixelClusterCOG_1Donly = 1
+doNotUseCornerPixelsInPixelClusterCOGEneg = 1
+// if either of those is -1, then all cluster sizes are analysed
+minNClusters4PairAnalysis = 2
+maxNClusters4PairAnalysis = 2
+
+applyMaxDtCut4Clustering = 1
+maxDtBetweenPixel4Clustering = 120

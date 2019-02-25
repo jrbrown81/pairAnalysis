@@ -1,4 +1,7 @@
 # pairAnalysis
+v8
+Added normalised dPhi distribution and ability to save selected pairs tree.
+
 v6
 Many changes, including timing, sub-pixelisation, event monitor...
 
