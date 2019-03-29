@@ -1,4 +1,3 @@
-// v8
 printOutSetupFileParameters = 0
 
 spectrumName = Na-22, 1400V
@@ -6,12 +5,14 @@ pathRoot_in_calib = /home/gate/qnap/GATE/QET/setup
 fname_pixel_mapping_file = LISA_QET_pixel_map_config
 TcalibFileName = timingCalib_400ns_60mV_2us
 
-prntOutF = 100000
+prntOutF = 200000
 // if -1, then do all events
 nEvents2Do = -1
 
 firstPixel = 1
 lastPixel = 968
+// in mm
+pixelPitch = 0.8
 nPixXY = 22
 nAMs = 2
 usePixelListToDisable = 1
@@ -32,7 +33,7 @@ plotPixelClusterSpectra = 0
 
 enableEventMonitor = 0
 // if nEvents2Display = -1, then display all events
-nEvents2Display = 200
+nEvents2Display = 1000
 eventNumber2Display = 95303
 
 minNTrigs4H = 0
@@ -43,28 +44,33 @@ minClusterSize4H = 0
 maxClusterSize4H = 10
 
 Na22Energy = 511
+XRF_Cd = 23.17
+XRF_Te = 27.47
 // all angles are in degrees
 angleOfSecondHead = 0
 relativePhiAngle = 90
-EwindowFor4PhiAnalyis_min = 480
-EwindowFor4PhiAnalyis_max = 540
-ThetaWindowFor4PhiAnalyis_min = 74
-ThetaWindowFor4PhiAnalyis_max = 90
+Ewindow4PhiAnalyis_min = 480
+Ewindow4PhiAnalyis_max = 540
+EtotWindow4PhiAnalyis_min = 960
+EtotWindow4PhiAnalyis_max = 1080
+// AM0
+Theta1WindowFor4PhiAnalyis_min = 94
+Theta1WindowFor4PhiAnalyis_max = 102
+// AM1
+Theta2WindowFor4PhiAnalyis_min = 94
+Theta2WindowFor4PhiAnalyis_max = 102
+// This means that if the theta window cut values above are not identical, then they could be applied on either head and not specifically to AM0 or AM1
+makeAsymmetricThetaWindow = 0
 makeCosineFit = 0
 // ns/mm, approximate for 1400V, 600 ns per 5 mm
-factor2ConvertAnodeTime2Distance = 120
-
-makeRawTimingStuff = 0
-minRawTiming4H = 0
-maxRawTiming4H = 1200
-nBinsRawTiming4H = 100
-minDeltaRawTiming4H = 0
-maxDeltaRawTiming4H = 500
-nBinsDeltaRawTiming4H = 250
+factor2ConvertAnodeTime2Distance = 95 127
+minZ = -5
+maxZ = 10
+nBinsZ = 200
 
 makeTimingCalibrationStuff = 1
 minAnodeTiming4H = -500
-maxAnodeTiming4H = 800
+maxAnodeTiming4H = 1200
 nBinsAnodeTiming4H = 200
 minDeltaAnodeTiming4H = 0
 maxDeltaAnodeTiming4H = 500
@@ -73,29 +79,47 @@ nBinsDeltaAnodeTiming4H = 200
 // 0 - all, 1 - fully internal (disable two most external rows), 2 - internal (disable one external row), 3 - NOT fully internal, 4 - NOT internal
 typeOfPixelsToUse = 0
 
-nBins_dPhi = 36
+nBins_dPhi = 38
 nBinsTheta4H = 36
 // In pixels
 maxDistanceBetweenClusters4ComptonPair = 10
 
 // Cluster reconstruction stuff
-maxClusterSize = 10
-minPixelEnergyThr4ClusterReconstruction = 30
+maxClusterSize = 7
+minPixelEnergyThr4ClusterReconstruction = 5
 neighbourSearchWindow = 1
-doNotUseCornerTouchingPixels4Clustering = 1
+doNotUseCornerTouchingTriggeredPixels4Clustering = 1
+doNotUseCornerTouchingPixels4Clustering = 0
 maxClusterSizeToSkipFrame = 25
 useOnlyTriggeredPixelsInCluster = 1
 
 // if either of those is -1, then all cluster sizes are analysed
-minClusterSize4PairAnalysis = -1
+minClusterSize4PairAnalysis = 1
 maxClusterSize4PairAnalysis = 2
-updateSinglePixelClusterCOGEneg = 1
-updateTwoPixelClusterCOGEneg = 1
-updateTwoPixelClusterCOG_1Donly = 1
 doNotUseCornerPixelsInPixelClusterCOGEneg = 1
 // if either of those is -1, then all cluster sizes are analysed
 minNClusters4PairAnalysis = 2
 maxNClusters4PairAnalysis = 2
 
 applyMaxDtCut4Clustering = 1
-maxDtBetweenPixel4Clustering = 120
+maxDtBetweenPixel4Clustering = 100
+
+enableUpdateEnergyClusters = 1
+
+// Single pixel clusters
+maxDtBetweenSinglePixClusters4updatingEnergy_low = 600
+maxDtBetweenSinglePixClusters4updatingEnergy_up = 100
+// Not required for updating the energy
+updateSinglePixelClusterCOG = 0
+
+// Two pixel clusters
+maxDtBetweenTwoPixClusters4updatingEnergy_low = 600
+maxDtBetweenTwoPixClusters4updatingEnergy_up = 100
+// Not required for updating the energy, only one of the three could be enabled.
+updateTwoPixelClusterCOG = 0
+updateTwoPixelClusterCOGshort_1D = 0
+updateTwoPixelClusterCOGlong_1D = 0
+
+// Cathode cuts
+eventHasToHaveCathodeSignal = 0
+maxCathodeEnergy = 1000

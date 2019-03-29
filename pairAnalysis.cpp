@@ -48,7 +48,7 @@ ofstream logfile;
 
 TString pathRoot = "./";
 
-const TString ver = "v8";
+const TString ver = "v11";
 const TString setup_file = "analysis_setup_pairAnalysis_" + ver + ".txt";
 
 const TString fname = "data";
@@ -73,6 +73,7 @@ Int_t nEvents2Do = -1;
 
 Int_t firstPixel = 1;
 Int_t lastPixel = 968;
+Float_t pixelPitch = 0.8;
 Int_t nPixXY = 22;
 Int_t nAMs = 2;
 Bool_t usePixelListToDisable = kFALSE;
@@ -103,22 +104,22 @@ Int_t maxClusterSize4H = 8;
 Int_t nBinsTheta4H = 18;
 
 Float_t Na22Energy = 511;
+Float_t XRF_Cd = 23.17;
+Float_t XRF_Te = 27.47;
 Float_t angleOfSecondHead = 90;
 Float_t relativePhiAngle = 90;
-Float_t EwindowFor4PhiAnalyis_min = 530;
-Float_t EwindowFor4PhiAnalyis_max = 530;
-Float_t ThetaWindowFor4PhiAnalyis_min = 60;
-Float_t ThetaWindowFor4PhiAnalyis_max = 90;
+Float_t Ewindow4PhiAnalyis_min = 530;
+Float_t Ewindow4PhiAnalyis_max = 530;
+Float_t Theta1WindowFor4PhiAnalyis_min = 60;
+Float_t Theta1WindowFor4PhiAnalyis_max = 90;
+Float_t Theta2WindowFor4PhiAnalyis_min = 60;
+Float_t Theta2WindowFor4PhiAnalyis_max = 90;
+Bool_t makeAsymmetricThetaWindow = kFALSE;
 Bool_t makeCosineFit = kFALSE;
-Float_t factor2ConvertAnodeTime2Distance = 120;
-
-Bool_t makeRawTimingStuff = kTRUE;
-Int_t minRawTiming4H = 0;
-Int_t maxRawTiming4H = 1200;
-Int_t nBinsRawTiming4H = 100;
-Int_t minDeltaRawTiming4H = 0;
-Int_t maxDeltaRawTiming4H = 500;
-Int_t nBinsDeltaRawTiming4H = 100;
+Float_t *factor2ConvertAnodeTime2Distance;
+Float_t minZ = -5;
+Float_t maxZ = 10;
+Int_t nBinsZ = 200;
 
 Bool_t makeTimingCalibrationStuff = kTRUE;
 Float_t minAnodeTiming4H = 0;
@@ -138,19 +139,36 @@ Float_t maxDistanceBetweenClusters4ComptonPair = 7;
 Int_t maxClusterSize = 10;
 Float_t minPixelEnergyThr4ClusterReconstruction = 15;
 Int_t neighbourSearchWindow = 1;
+Bool_t doNotUseCornerTouchingTriggeredPixels4Clustering = kTRUE;
 Bool_t doNotUseCornerTouchingPixels4Clustering = kTRUE;
 Int_t maxClusterSizeToSkipFrame = 25;
 Bool_t useOnlyTriggeredPixelsInCluster = kFALSE;
 Int_t minClusterSize4PairAnalysis = -1;
 Int_t maxClusterSize4PairAnalysis = -1;
-Bool_t updateSinglePixelClusterCOGEneg = kTRUE;
-Bool_t updateTwoPixelClusterCOGEneg = kTRUE;
-Bool_t updateTwoPixelClusterCOG_1Donly = kTRUE;
 Float_t maxDtBetweenPixel4Clustering = 200;
 Bool_t applyMaxDtCut4Clustering = kFALSE;
 Bool_t doNotUseCornerPixelsInPixelClusterCOGEneg = kFALSE;
 Int_t minNClusters4PairAnalysis = 1;
 Int_t maxNClusters4PairAnalysis = 2;
+
+Bool_t enableUpdateEnergyClusters = kFALSE;
+
+// Single pixel clusters
+Float_t maxDtBetweenSinglePixClusters4updatingEnergy_low = 200;
+Float_t maxDtBetweenSinglePixClusters4updatingEnergy_up = 200;
+// Not required for updating the energy
+Bool_t updateSinglePixelClusterCOG = kFALSE;
+
+// Two pixel clusters
+Float_t maxDtBetweenTwoPixClusters4updatingEnergy_low = 200;
+Float_t maxDtBetweenTwoPixClusters4updatingEnergy_up = 200;
+// Not required for updating the energy
+Bool_t updateTwoPixelClusterCOG = kFALSE;
+Bool_t updateTwoPixelClusterCOGshort_1D = kFALSE;
+Bool_t updateTwoPixelClusterCOGlong_1D = kFALSE;
+
+Bool_t eventHasToHaveCathodeSignal = 1;
+Float_t maxCathodeEnergy = 540;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // End of running parameters
@@ -182,12 +200,6 @@ const Int_t nVarsComptonChains = 4; // energy, x, y, z
 Bool_t ***pixelStatus;
 Int_t ***pixelStatusGlobal;
 TH2F *image;
-TH2F *imageNEG;
-TH2F *imageBG;
-TH2F *imageBGneg;
-TH2I *imageTiming;
-TH2I *imagePos;
-TH2I *imageTrig;
 TH2I **pixelPattern;
 TH2I **pixelTypePattern;
 TH2I **usedCentrePixelPattern;
@@ -197,6 +209,8 @@ std::vector<std::vector<Int_t>> matrix_flags;
 std::vector<std::vector<Int_t>> matrix_time;
 std::vector<std::vector<Float_t>> matrix_timeCalib;
 std::vector<std::vector<Float_t>> matrix_E;
+std::vector<std::vector<Int_t>> matrix_trigs_4sum;
+std::vector<std::vector<Float_t>> matrix_Eall; // pixel energy + assigned neighbour
 std::vector<std::vector<Float_t>> matrix_Eneg;
 std::vector<Int_t> buffX;
 std::vector<Int_t> buffY;
@@ -206,17 +220,20 @@ std::vector<Int_t> buffYnew;
 std::vector<std::vector<Float_t>> buffClusterX;
 std::vector<std::vector<Float_t>> buffClusterY;
 std::vector<std::vector<Float_t>> buffClusterE;
+std::vector<std::vector<Float_t>> buffClusterEorig;
 std::vector<std::vector<Float_t>> buffClusterArea;
-std::vector<std::vector<Float_t>> buffClusterFlag;
-std::vector<std::vector<Float_t>> buffClusterTrigs;
+std::vector<std::vector<Int_t>> buffClusterFlag;
+std::vector<std::vector<Int_t>> buffClusterTrigs;
 std::vector<std::vector<Int_t>> buffClusterIsSplit;
+std::vector<std::vector<Int_t>> buffClusterOrientation;
 std::vector<std::vector<Float_t>> buffClusterAnodeTiming;
 std::vector<Float_t> buffClusterXloc;
 std::vector<Float_t> buffClusterYloc;
 std::vector<Float_t> buffClusterEloc;
+std::vector<Float_t> buffClusterEorigloc;
 std::vector<Float_t> buffClusterArealoc;
-std::vector<Float_t> buffClusterFlagloc;
-std::vector<Float_t> buffClusterTrigsloc;
+std::vector<Int_t> buffClusterFlagloc;
+std::vector<Int_t> buffClusterTrigsloc;
 std::vector<Int_t> buffClusterXarr;
 std::vector<Int_t> buffClusterYarr;
 std::vector<Int_t> buffClusterTimearr;
@@ -225,6 +242,10 @@ std::vector<Int_t> buffClusterTrigsarr;
 std::vector<Int_t> buffClusterPixelarr;
 std::vector<Int_t> buffClusterIsSplitloc;
 std::vector<Float_t> buffClusterAnodeTimingloc;
+std::vector<Float_t> buff_E_neighb_4sum;
+std::vector<Int_t> buffClusterOrientationloc;
+std::vector<Int_t> buff_X_neighb_4sum;
+std::vector<Int_t> buff_Y_neighb_4sum;
 
 TChain* chain_events;
 TChain** chain1p;
@@ -252,6 +273,7 @@ Int_t *nTrigPixels_eev;
 Int_t *cntEntryTree;
 Long64_t *Nev;
 TLine *line2;
+TLine *line1;
 Bool_t *disabledPixels;
 Int_t nDisabledPixels = 0;
 
@@ -259,53 +281,73 @@ TH1F **cathodeSpecAllEvents;
 TH1F **cathodeSpecPair;
 TH1F **cathodeSpecSelPairs;
 TH1F **allClustersSpec;
-TH1F **singleClusterEventsSpec;
-TH1F **summedClusterEventsSpec;
 TH1F **nTrigsInEvent;
-TH2F **nTrigsInEvent_maxEcluster;
 TH1F **comptonSummedSpec2Clusters;
-TH1F **comptonSummedSpecEventClusters;
+TH1F **comptonSummedSpec2Clusters_1PixClusters;
+TH1F **comptonSummedSpec2Clusters_2PixClusters;
+TH1F **comptonSummedSpec2Clusters_1_2PixClusters;
+TH1F **comptonSummedSpec2Clusters_Eunsummed;
+TH1F **comptonSummedSpec2Clusters_1PixClusters_Eunsummed;
+TH1F **comptonSummedSpec2Clusters_2PixClusters_Eunsummed;
+TH1F **comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed;
 TH1F **comptonSpecClusters;
+TH1F **comptonSpecClusters_Eunsummed;
 TH2F **comptonSpec2ClustersCorr;
+TH2F **clusterSpec2ClusterEventsCorr;
 TH2F *comptonSummedSpec2ClustersCorr;
-TH2F *comptonSummedSpecEventCorr;
+TH1F *comptonSummedSpec2Clusters2Heads;
+TH2F *comptonSummedSpec2ClustersSelEventsCorr;
+TH1F *comptonSummedSpec2ClustersSelEvents2Heads;
 TH1F **phiAngle;
 TH1F **phiAngleSelEvents;
 TH1F *dPhiAngle;
 TH1F *dPhiAngle_Ewin;
+TH1F *dPhiAngle_w;
+TH1F *dPhiAngle_Ewin_w;
 TH1F *dPhiAngleNorm;
 TH1F *dPhiAngleNorm_Ewin;
+TH1F *dPhiAngleNorm_w;
+TH1F *dPhiAngleNorm_Ewin_w;
 TH1F *dPhiAngle1;
 TH1F *dPhiAngle1_Ewin;
+TH1F *dPhiAngle1norm;
+TH1F *dPhiAngle1norm_Ewin;
 TH2F *dPhiAngle_2ClusterE;
-TH2F *dPhiAngle_totalE;
+TH1F *dPhiXYtAngle;
+TH1F *dPhiXYtAngle_Ewin;
+TH1F *dPhiXYtAngleNorm;
+TH1F *dPhiXYtAngleNorm_Ewin;
+TH1F *dPhiXYtAngle1;
+TH1F *dPhiXYtAngle1_Ewin;
+TH1F *dPhiXYtAngle1Norm;
+TH1F *dPhiXYtAngle1Norm_Ewin;
 TH2F *phiAngleCorr;
 TH2F *phiAngleSelEventsCorr;
 TH2F **dPhiPlaneAM;
 TH2F **firstComptonCluster;
 TH2F **secondComptonCluster;
 TH2F **clusterE_vsSize;
-TH2F *singleClusterSpecCorr;
-TH2F *summedClusterSpecCorr;
 TH1F **thetaFromFirstClusterE;
 TH2F **thetaFromFirstClusterE_dPhi;
+TH2F **thetaFromFirstClusterE_dPhi_w;
+TH2F **thetaFromXYtClusterE_dPhi;
+TH2F **thetaFromXYtClusterE_dPhi_w;
+TH1F **thetaFromXYtE;
+TH1F **thetaFromXYtE_w;
+TH2F **theta_firstCluster_XYtE_Corr;
+TH2F **theta_firstCluster_XYtE_Corr_w;
 TH1F **clusterSize;
 TH2F *theta0_theta1_FromFirstClusterE;
-TH2F **nTrigs_clusterSize;
-TH2F **clusterE_nTrigs;
+TH2F **clusterSize_nClusters;
+TH1F **numberOfClusters;
 TH2F **clusterMaxE_vsSize;
-TH2F **clusterSecE_vsSize;
-TH2F **clusterSizeMaxE_SecE;
+TH2F **clusterSize2ClusterEventsCorr;
 TH2F **imageE;
 TH2F **imageT;
 TH2F **imageC;
 TH2I **imageN;
-TH2F **comptonHitsSpecClustersSizeCorr;
-TH2F **comptonHitsClusters_nTrigsCorr;
 TH1F **nClustersInEvent;
-TH2F *nClustersInEventCorr;
 TH1F **nClustersInSelEvent;
-TH2F *nClustersInSelEventCorr;
 TH1F **firstComptonClusterSize;
 TH1F **secondComptonClusterSize;
 TH1F **firstComptonClusterSizeSelEvents;
@@ -315,18 +357,10 @@ TH1F **thetaFromFirstClusterE_1pixOnly;
 TH1F **thetaFromFirstClusterE_1pixOnly_w;
 TH1F **thetaFromFirstClusterE_2pixOnly;
 TH1F **thetaFromFirstClusterE_1_2pixOnly;
-TH2I **rawTimingTwoPixelClustersCorr;
-TH1I **rawTimingDiff2PixClusters;
-TH1I **rawTimingDiff2PixDiagClusters;
-TH1I **rawTimingDiffAllClusters;
-TH1I **rawTimingDiff3PixClusters;
-TH2F **anodeTimingTwoPixelClustersCorr;
 TH1F **anodeTimingDiff2PixDiagClusters;
 TH1F **anodeTimingDiff2PixClusters;
 TH1F **anodeTimingDiffAllClusters;
-TH1F **anodeTimingDiff3PixClusters;
 TH2F **anodeTiming2PixDiagClustersCorr;
-TH2F **anodeTiming3PixClustersCorr;
 TH2F **anodeTiming2PixClustersCorr;
 TH2F **allClustersCOGImage;
 TH2F **allPixelsImage;
@@ -335,16 +369,30 @@ TH2F **allPixelsFreqImage;
 TH2F **allClustersCOGFreqImage;
 TH2F **allClustersFineCOGFreqImage;
 TH1F ***clusterSpec;
-TH2F **anodeTimingTwoClustersAMCorr;
 TH2F **dAnodeTiming_vs_theta;
 TH2F **dAnodeTiming_vs_E1;
 TH2F **dAnodeTiming_vs_E2;
 TH2F **dAnodeTiming_vs_E12;
 TH2F **dAnodeTimingAbs_vs_E12;
-TH2F **dist12_vs_E1;
-TH2F **dist12_vs_E2;
-TH2F **dist12_vs_E12;
-TH2F **dist12_over_E12sq;
+TH2F **anodeTiming1PixelClustersNeigbCorr;
+TH2F **anodeTiming2PixelClustersNeigbCorr;
+TH2F **dAnodeTiming_vs_nE_1PixelClustersNeigb;
+TH2F **dAnodeTiming_vs_sumE_1PixelClustersNeigb;
+TH2F **dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters;
+TH1F **pixelSpecNeighbour1PixClusters;
+TH2F **energySpecCorr1PixClusters;
+TH2F **energySpecCorr2PixClusters;
+TH1F **clusterSpec_1ClusterEvents_summed;
+TH1F **clusterSpec_1ClusterEvents;
+TH1F **firstComptonClusterE;
+TH1F **secondComptonClusterE;
+TH2F **anodeTimingNeigb_nE_1PixelClusters;
+TH2F **anodeTimingNeigb_nE_2PixelClusters;
+TH1F **clusterZfromAnodeTiming;
+TH1F **comptonEventsDeltaZpix;
+TH1F **comptonEventsDeltaZdist;
+TH1F **clusterSummingStats1PixClusters;
+TH1F **clusterSummingStats2PixClusters;
 
 TRandom3 *rand3;
 TStopwatch localTimer;
@@ -374,8 +422,17 @@ void getNewNeighbours(Int_t, Int_t, Int_t);
 Float_t getThetaFromEnergy(const Float_t, const Float_t);
 Float_t getScatteredEnergyFromAngle(const Float_t, const Float_t);
 Float_t updateSinglePixelClusterCOGwithEneg(const Int_t, const Int_t, Float_t &, Float_t &);
-void updateTwoPixelClusterCOGwithEneg(const Int_t, const Float_t, const Float_t, const Int_t, const Int_t, const Int_t, const Int_t, Float_t &, Float_t &);
 void sortClusters(const Int_t);
+Double_t fitMAC(Double_t *, Double_t *);
+void updateClustersWithNeighboursEnergy(const Int_t, const Int_t);
+Float_t getThetaAngleFromHitsXYt(const Int_t, const Float_t, const Float_t, const Float_t, const Float_t, const Float_t, const Float_t);
+
+const Int_t nMAC = 11;
+const Int_t nMACbd = 5;
+const Double_t e4MAC[nMAC] = {40,50,60,80,100,150,200,300,400,500,600}; 
+const Double_t MAC[nMAC] = {19.3,10.67,6.542,3.019,1.671,0.6071,0.3246,0.1628,0.1147,0.09291,0.08042}; 
+TH1F * prob_h1;
+TH1F * prob2_h1;
 
 int main()
 {
@@ -398,6 +455,16 @@ int main()
 				<< ",  maxNClusters4PairAnalysis = " << maxNClusters4PairAnalysis << ". Exiting." << endl;
 		return 0;
 	}
+	
+	if ((updateTwoPixelClusterCOG && updateTwoPixelClusterCOGshort_1D) || (updateTwoPixelClusterCOG && updateTwoPixelClusterCOGlong_1D) || (updateTwoPixelClusterCOGshort_1D && updateTwoPixelClusterCOGlong_1D))
+	{
+		cerr << "ERROR: Wrong settings for two pixel cluster COG update, only one of the options could be enabled:" << endl;
+		cerr << "updateTwoPixelClusterCOG = " << updateTwoPixelClusterCOG << endl; 
+		cerr << "updateTwoPixelClusterCOGshort_1D = " << updateTwoPixelClusterCOGshort_1D << endl; 
+		cerr << "updateTwoPixelClusterCOGlong_1D = " << updateTwoPixelClusterCOGlong_1D << endl;
+		cerr << "Exiting." << endl;
+		return 0;
+	}	
 	
 	if (enableEventMonitor)
 	{
@@ -702,6 +769,16 @@ int main()
 			gSystem->MakeDirectory(outputPixelPathAM[im]);
 		}
 	}
+	
+	TFile* f_ref = new TFile("probabilites_ref.root", "read");
+	prob_h1 = (TH1F *) f_ref->Get("probThetaRec_E1_vs_E1");
+	prob2_h1 = (TH1F *) f_ref->Get("prob2ThetaRec_E1_vs_E1");
+	prob_h1->SetName("prob_h1");
+	prob_h1->SetDirectory(0);
+	prob2_h1->SetName("prob2_h1");
+	prob2_h1->SetDirectory(0);
+	f_ref->Close();
+	
 	TFile *hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
 	
 	image = new TH2F("image","Event image",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
@@ -709,42 +786,6 @@ int main()
 	image->GetXaxis()->SetTitleOffset(1.2);
 	image->GetYaxis()->SetTitle("Pixel number");
 	image->GetYaxis()->SetTitleOffset(1.2);
-	
-	imageNEG = new TH2F("imageNEG","Event image, negative energy",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
-	imageNEG->GetXaxis()->SetTitle("Pixel number");
-	imageNEG->GetXaxis()->SetTitleOffset(1.2);
-	imageNEG->GetYaxis()->SetTitle("Pixel number");
-	imageNEG->GetYaxis()->SetTitleOffset(1.2);
-	
-	imageBG = new TH2F("imageBG","Event image BG",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
-	imageBG->GetXaxis()->SetTitle("Pixel number");
-	imageBG->GetXaxis()->SetTitleOffset(1.2);
-	imageBG->GetYaxis()->SetTitle("Pixel number");
-	imageBG->GetYaxis()->SetTitleOffset(1.2);
-	
-	imageBGneg = new TH2F("imageBGneg","Event image BG negative",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
-	imageBGneg->GetXaxis()->SetTitle("Pixel number");
-	imageBGneg->GetXaxis()->SetTitleOffset(1.2);
-	imageBGneg->GetYaxis()->SetTitle("Pixel number");
-	imageBGneg->GetYaxis()->SetTitleOffset(1.2);
-	
-	imagePos = new TH2I("imagePos","Image of pixel energy ordering in event",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
-	imagePos->GetXaxis()->SetTitle("Pixel number");
-	imagePos->GetXaxis()->SetTitleOffset(1.2);
-	imagePos->GetYaxis()->SetTitle("Pixel number");
-	imagePos->GetYaxis()->SetTitleOffset(1.2);
-	
-	imageTrig = new TH2I("imageTrig","Triggered pixels in event",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
-	imageTrig->GetXaxis()->SetTitle("Pixel number");
-	imageTrig->GetXaxis()->SetTitleOffset(1.2);
-	imageTrig->GetYaxis()->SetTitle("Pixel number");
-	imageTrig->GetYaxis()->SetTitleOffset(1.2);
-	
-	imageTiming = new TH2I("imageTiming","Anode timing event image",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
-	imageTiming->GetXaxis()->SetTitle("Pixel number");
-	imageTiming->GetXaxis()->SetTitleOffset(1.2);
-	imageTiming->GetYaxis()->SetTitle("Pixel number");
-	imageTiming->GetYaxis()->SetTitleOffset(1.2);
 	
 	chain_events = new TChain("tree2_events");
 	chain1p = new TChain*[nAMs];
@@ -872,21 +913,34 @@ int main()
 	nTrigsInEvent = new TH1F*[nAMs];
 	clusterE_vsSize = new TH2F*[nAMs];
 	clusterMaxE_vsSize = new TH2F*[nAMs];
-	clusterSecE_vsSize = new TH2F*[nAMs];
-	clusterSizeMaxE_SecE = new TH2F*[nAMs];
-	nTrigsInEvent_maxEcluster = new TH2F*[nAMs];
+	numberOfClusters = new TH1F*[nAMs];
+	clusterSize2ClusterEventsCorr = new TH2F*[nAMs];
+	clusterSpec_1ClusterEvents = new TH1F*[nAMs];
 	cathodeSpecAllEvents = new TH1F*[nAMs];
 	cathodeSpecPair = new TH1F*[nAMs];
 	cathodeSpecSelPairs = new TH1F*[nAMs];
 	allClustersSpec = new TH1F*[nAMs];
-	singleClusterEventsSpec = new TH1F*[nAMs];
-	summedClusterEventsSpec = new TH1F*[nAMs];
-	comptonSummedSpec2Clusters = new TH1F*[nAMs];
-	comptonSummedSpecEventClusters = new TH1F*[nAMs];
-	comptonSpecClusters = new TH1F*[nAMs];
+	pixelSpecNeighbour1PixClusters = new TH1F*[nAMs];
+	clusterSpec_1ClusterEvents_summed = new TH1F*[nAMs];
+	comptonSpecClusters_Eunsummed = new TH1F*[nAMs];
+	comptonSummedSpec2Clusters_Eunsummed = new TH1F*[nAMs];
+	comptonSummedSpec2Clusters_1PixClusters_Eunsummed = new TH1F*[nAMs];
+	comptonSummedSpec2Clusters_2PixClusters_Eunsummed = new TH1F*[nAMs];
+	comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed = new TH1F*[nAMs];
+	if (enableUpdateEnergyClusters)
+	{		
+		comptonSpecClusters = new TH1F*[nAMs];
+		comptonSummedSpec2Clusters = new TH1F*[nAMs];
+		comptonSummedSpec2Clusters_1PixClusters = new TH1F*[nAMs];
+		comptonSummedSpec2Clusters_2PixClusters = new TH1F*[nAMs];
+		comptonSummedSpec2Clusters_1_2PixClusters = new TH1F*[nAMs];
+		energySpecCorr1PixClusters = new TH2F*[nAMs];
+		energySpecCorr2PixClusters = new TH2F*[nAMs];
+		clusterSummingStats1PixClusters = new TH1F*[nAMs];
+		clusterSummingStats2PixClusters = new TH1F*[nAMs];
+	}
 	comptonSpec2ClustersCorr = new TH2F*[nAMs];
-	comptonHitsSpecClustersSizeCorr = new TH2F*[nAMs];
-	comptonHitsClusters_nTrigsCorr = new TH2F*[nAMs];
+	clusterSpec2ClusterEventsCorr = new TH2F*[nAMs];
 	phiAngle = new TH1F*[nAMs];
 	phiAngleSelEvents = new TH1F*[nAMs];
 	dPhiPlaneAM = new TH2F*[nAMs];
@@ -897,9 +951,15 @@ int main()
 	secondComptonCluster = new TH2F*[nAMs];
 	thetaFromFirstClusterE = new TH1F*[nAMs];
 	thetaFromFirstClusterE_dPhi = new TH2F*[nAMs];
+	thetaFromFirstClusterE_dPhi_w = new TH2F*[nAMs];
+	thetaFromXYtClusterE_dPhi = new TH2F*[nAMs];
+	thetaFromXYtClusterE_dPhi_w = new TH2F*[nAMs];
+	thetaFromXYtE = new TH1F*[nAMs];
+	thetaFromXYtE_w = new TH1F*[nAMs];
+	theta_firstCluster_XYtE_Corr = new TH2F*[nAMs];
+	theta_firstCluster_XYtE_Corr_w = new TH2F*[nAMs];
 	clusterSize = new TH1F*[nAMs];
-	nTrigs_clusterSize = new TH2F*[nAMs];
-	clusterE_nTrigs = new TH2F*[nAMs];
+	clusterSize_nClusters = new TH2F*[nAMs];
 	nClustersInEvent = new TH1F*[nAMs];
 	nClustersInSelEvent = new TH1F*[nAMs];	
 	firstComptonClusterSize = new TH1F*[nAMs];
@@ -914,39 +974,37 @@ int main()
 	allPixelsFreqImage = new TH2F*[nAMs];
 	allClustersCOGFreqImage = new TH2F*[nAMs];
 	allClustersFineCOGFreqImage = new TH2F*[nAMs];
+	firstComptonClusterE = new TH1F*[nAMs];
+	secondComptonClusterE = new TH1F*[nAMs];
+	comptonEventsDeltaZpix = new TH1F*[nAMs];
 	if (plotPixelClusterSpectra) clusterSpec = new TH1F**[nAMs];
-	
-	if (makeRawTimingStuff)
-	{
-		rawTimingTwoPixelClustersCorr = new TH2I*[nAMs];
-		rawTimingDiff2PixClusters = new TH1I*[nAMs];
-		rawTimingDiffAllClusters = new TH1I*[nAMs];
-		if (!doNotUseCornerPixelsInPixelClusterCOGEneg) rawTimingDiff2PixDiagClusters = new TH1I*[nAMs];
-		rawTimingDiff3PixClusters = new TH1I*[nAMs];
-	}
+	comptonEventsDeltaZdist = new TH1F*[nAMs];
 	if (makeTimingCalibrationStuff)
 	{
-		anodeTimingTwoPixelClustersCorr = new TH2F*[nAMs];
+		clusterZfromAnodeTiming = new TH1F*[nAMs];
 		anodeTimingDiff2PixClusters = new TH1F*[nAMs];
 		anodeTimingDiffAllClusters = new TH1F*[nAMs];
-		anodeTimingDiff3PixClusters = new TH1F*[nAMs];
 		if (!doNotUseCornerPixelsInPixelClusterCOGEneg)
 		{
 			anodeTiming2PixDiagClustersCorr = new TH2F*[nAMs];
 			anodeTimingDiff2PixDiagClusters = new TH1F*[nAMs];
 		}
-		anodeTiming3PixClustersCorr = new TH2F*[nAMs];
 		anodeTiming2PixClustersCorr = new TH2F*[nAMs];
-		anodeTimingTwoClustersAMCorr = new TH2F*[nAMs];
 		dAnodeTiming_vs_theta = new TH2F*[nAMs];
 		dAnodeTiming_vs_E1 = new TH2F*[nAMs];
 		dAnodeTiming_vs_E2 = new TH2F*[nAMs];
 		dAnodeTiming_vs_E12 = new TH2F*[nAMs];
 		dAnodeTimingAbs_vs_E12 = new TH2F*[nAMs];
-		dist12_vs_E1 = new TH2F*[nAMs];
-		dist12_vs_E2 = new TH2F*[nAMs];
-		dist12_vs_E12 = new TH2F*[nAMs];
-		dist12_over_E12sq = new TH2F*[nAMs];
+		if (enableUpdateEnergyClusters)
+		{		
+			dAnodeTiming_vs_nE_1PixelClustersNeigb = new TH2F*[nAMs];
+			dAnodeTiming_vs_sumE_1PixelClustersNeigb = new TH2F*[nAMs];
+			dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters = new TH2F*[nAMs];
+			anodeTiming1PixelClustersNeigbCorr = new TH2F*[nAMs];
+			anodeTiming2PixelClustersNeigbCorr = new TH2F*[nAMs];
+			anodeTimingNeigb_nE_1PixelClusters = new TH2F*[nAMs];
+			anodeTimingNeigb_nE_2PixelClusters = new TH2F*[nAMs];
+		}
 	}
 
 	if (enableEventMonitor)
@@ -1035,6 +1093,44 @@ int main()
 		thetaFromFirstClusterE_dPhi[im]->GetYaxis()->SetTitleOffset(1.4);
 		thetaFromFirstClusterE_dPhi[im]->GetYaxis()->SetTitle(Form("#Delta#varphi AM%d, degrees",im));
 
+		thetaFromFirstClusterE_dPhi_w[im] = new TH2F(Form("thetaFromFirstClusterE_dPhi_w_AM%d",im),Form("%s, #theta calculated from first interaction energy, weighted, AM%d",spectrumName.Data(),im),nBinsTheta4H,0,180,nBins_dPhi,-180,180);
+		thetaFromFirstClusterE_dPhi_w[im]->GetXaxis()->SetTitleOffset(1.2);
+		thetaFromFirstClusterE_dPhi_w[im]->GetXaxis()->SetTitle(Form("#theta in AM%d, degrees",im));
+		thetaFromFirstClusterE_dPhi_w[im]->GetYaxis()->SetTitleOffset(1.4);
+		thetaFromFirstClusterE_dPhi_w[im]->GetYaxis()->SetTitle(Form("#Delta#varphi AM%d, degrees",im));
+
+		thetaFromXYtClusterE_dPhi[im] = new TH2F(Form("thetaFromXYtClusterE_dPhi_AM%d",im),Form("%s, #theta calculated from first interaction energy, AM%d",spectrumName.Data(),im),nBinsTheta4H,0,180,nBins_dPhi,-180,180);
+		thetaFromXYtClusterE_dPhi[im]->GetXaxis()->SetTitleOffset(1.2);
+		thetaFromXYtClusterE_dPhi[im]->GetXaxis()->SetTitle(Form("#theta in AM%d, degrees",im));
+		thetaFromXYtClusterE_dPhi[im]->GetYaxis()->SetTitleOffset(1.4);
+		thetaFromXYtClusterE_dPhi[im]->GetYaxis()->SetTitle(Form("#Delta#varphi AM%d, degrees",im));
+
+		thetaFromXYtClusterE_dPhi_w[im] = new TH2F(Form("thetaFromXYtClusterE_dPhi_w_AM%d",im),Form("%s, #theta calculated from first interaction energy, weighted, AM%d",spectrumName.Data(),im),nBinsTheta4H,0,180,nBins_dPhi,-180,180);
+		thetaFromXYtClusterE_dPhi_w[im]->GetXaxis()->SetTitleOffset(1.2);
+		thetaFromXYtClusterE_dPhi_w[im]->GetXaxis()->SetTitle(Form("#theta in AM%d, degrees",im));
+		thetaFromXYtClusterE_dPhi_w[im]->GetYaxis()->SetTitleOffset(1.4);
+		thetaFromXYtClusterE_dPhi_w[im]->GetYaxis()->SetTitle(Form("#Delta#varphi AM%d, degrees",im));
+		
+		thetaFromXYtE[im] = new TH1F(Form("thetaFromXYtE_AM%d",im),Form("%s, #theta calculated from X-Y-t, AM%d",spectrumName.Data(),im),nBinsTheta4H,0,180);
+		thetaFromXYtE[im]->GetXaxis()->SetTitleOffset(1.2);
+		thetaFromXYtE[im]->GetXaxis()->SetTitle(Form("#theta in AM%d, degrees",im));
+
+		thetaFromXYtE_w[im] = new TH1F(Form("thetaFromXYtE_w_AM%d",im),Form("%s, #theta calculated from X-Y-t, weighted, AM%d",spectrumName.Data(),im),nBinsTheta4H,0,180);
+		thetaFromXYtE_w[im]->GetXaxis()->SetTitleOffset(1.2);
+		thetaFromXYtE_w[im]->GetXaxis()->SetTitle(Form("#theta in AM%d, degrees",im));
+	
+		theta_firstCluster_XYtE_Corr[im] = new TH2F(Form("theta_firstCluster_XYtE_Corr_AM%d",im),Form("%s, #theta calculated from X-Y-t, AM%d",spectrumName.Data(),im),nBinsTheta4H,0,180,nBinsTheta4H,0,180);
+		theta_firstCluster_XYtE_Corr[im]->GetXaxis()->SetTitleOffset(1.2);
+		theta_firstCluster_XYtE_Corr[im]->GetXaxis()->SetTitle(Form("#theta using first cluster energy, degrees, AM%d",im));
+		theta_firstCluster_XYtE_Corr[im]->GetYaxis()->SetTitleOffset(1.4);
+		theta_firstCluster_XYtE_Corr[im]->GetYaxis()->SetTitle(Form("#theta using X-Y-t, degrees, AM%d",im));
+	
+		theta_firstCluster_XYtE_Corr_w[im] = new TH2F(Form("theta_firstCluster_XYtE_Corr_w_AM%d",im),Form("%s, #theta calculated from X-Y-t, weighted, AM%d",spectrumName.Data(),im),nBinsTheta4H,0,180,nBinsTheta4H,0,180);
+		theta_firstCluster_XYtE_Corr_w[im]->GetXaxis()->SetTitleOffset(1.2);
+		theta_firstCluster_XYtE_Corr_w[im]->GetXaxis()->SetTitle(Form("#theta using first cluster energy, degrees, AM%d",im));
+		theta_firstCluster_XYtE_Corr_w[im]->GetYaxis()->SetTitleOffset(1.4);
+		theta_firstCluster_XYtE_Corr_w[im]->GetYaxis()->SetTitle(Form("#theta using X-Y-t, degrees, AM%d",im));
+	
 		nTrigsInEvent[im] = new TH1F(Form("nTrigsInEvent_AM%d",im),Form("%s, number of triggers per event, AM%d",spectrumName.Data(),im),maxNTrigs4H-minNTrigs4H,minNTrigs4H,maxNTrigs4H);
 		nTrigsInEvent[im]->GetXaxis()->SetTitleOffset(1.2);
 		nTrigsInEvent[im]->GetXaxis()->SetTitle(Form("Number of triggers in AM%d",im));
@@ -1047,51 +1143,21 @@ int main()
 		nClustersInSelEvent[im]->GetXaxis()->SetTitleOffset(1.2);
 		nClustersInSelEvent[im]->GetXaxis()->SetTitle(Form("Number of clusters in AM%d",im));
 		
-		nTrigs_clusterSize[im] = new TH2F(Form("nTrigs_clusterSize_AM%d",im),Form("%s, number of triggers in cluster vs cluster size, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H,maxNTrigs4H_2D-minNTrigs4H_2D,minNTrigs4H_2D,maxNTrigs4H_2D);
-		nTrigs_clusterSize[im]->GetXaxis()->SetTitleOffset(1.2);
-		nTrigs_clusterSize[im]->GetXaxis()->SetTitle(Form("AM%d cluster size, pixels",im));	
-		nTrigs_clusterSize[im]->GetYaxis()->SetTitleOffset(1.4);
-		nTrigs_clusterSize[im]->GetYaxis()->SetTitle("Number of triggers in cluster");		
-		
-		if (makeRawTimingStuff) 
-		{
-			rawTimingTwoPixelClustersCorr[im] = new TH2I(Form("rawTimingTwoPixelClustersCorr_AM%d",im),Form("%s, Correlation between triggered pixel raw timing, two triggered pixel clusters only, AM%d",spectrumName.Data(),im),nBinsRawTiming4H,minRawTiming4H,maxRawTiming4H,nBinsRawTiming4H,minRawTiming4H,maxRawTiming4H);
-			rawTimingTwoPixelClustersCorr[im]->GetXaxis()->SetTitleOffset(1.2);
-			rawTimingTwoPixelClustersCorr[im]->GetXaxis()->SetTitle(Form("Raw timing, first pixel, AM%d",im));	
-			rawTimingTwoPixelClustersCorr[im]->GetYaxis()->SetTitleOffset(1.4);
-			rawTimingTwoPixelClustersCorr[im]->GetYaxis()->SetTitle(Form("Raw timing, second pixel, AM%d",im));	
-
-			rawTimingDiff2PixClusters[im] = new TH1I(Form("rawTimingDiff2PixClusters_AM%d",im),Form("%s, Difference in triggered pixel raw timing, two triggered pixel clusters only, AM%d",spectrumName.Data(),im),nBinsDeltaRawTiming4H,minDeltaRawTiming4H,maxDeltaRawTiming4H);
-			rawTimingDiff2PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
-			rawTimingDiff2PixClusters[im]->GetXaxis()->SetTitle(Form("Raw timing difference between pixels, AM%d",im));	
-
-			rawTimingDiff3PixClusters[im] = new TH1I(Form("rawTimingDiff3PixClusters_AM%d",im),Form("%s, Difference in triggered pixel raw timing, three and more triggered pixel clusters only, AM%d",spectrumName.Data(),im),nBinsDeltaRawTiming4H,minDeltaRawTiming4H,maxDeltaRawTiming4H);
-			rawTimingDiff3PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
-			rawTimingDiff3PixClusters[im]->GetXaxis()->SetTitle(Form("Raw timing difference between pixels, AM%d",im));	
+		clusterSize_nClusters[im] = new TH2F(Form("clusterSize_nClusters_AM%d",im),Form("%s, number of triggers in cluster vs cluster size, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H,maxNTrigs4H_2D-minNTrigs4H_2D,minNTrigs4H_2D,maxNTrigs4H_2D);
+		clusterSize_nClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+		clusterSize_nClusters[im]->GetXaxis()->SetTitle(Form("Cluster size, pixels, AM%d",im));	
+		clusterSize_nClusters[im]->GetYaxis()->SetTitleOffset(1.4);
+		clusterSize_nClusters[im]->GetYaxis()->SetTitle("Number of clusters/event");
 			
-			rawTimingDiffAllClusters[im] = new TH1I(Form("rawTimingDiffAllClusters_AM%d",im),Form("%s, Difference in triggered pixel raw timing, all clusters, AM%d",spectrumName.Data(),im),nBinsDeltaRawTiming4H,minDeltaRawTiming4H,maxDeltaRawTiming4H);
-			rawTimingDiffAllClusters[im]->GetXaxis()->SetTitleOffset(1.2);
-			rawTimingDiffAllClusters[im]->GetXaxis()->SetTitle(Form("Raw timing difference between pixels, AM%d",im));
-			
-			if (!doNotUseCornerPixelsInPixelClusterCOGEneg) 
-			{
-				rawTimingDiff2PixDiagClusters[im] = new TH1I(Form("rawTimingDiff2PixDiagClusters_AM%d",im),Form("%s, Difference in triggered pixel raw timing, two triggered diagonal pixel clusters only, AM%d",spectrumName.Data(),im),nBinsDeltaRawTiming4H,minDeltaRawTiming4H,maxDeltaRawTiming4H);
-				rawTimingDiff2PixDiagClusters[im]->GetXaxis()->SetTitleOffset(1.2);
-				rawTimingDiff2PixDiagClusters[im]->GetXaxis()->SetTitle(Form("Raw timing difference between pixels, AM%d",im));
-			}
-		}
+		comptonEventsDeltaZpix[im] = new TH1F(Form("comptonEventsDeltaZpix_AM%d",im),Form("%s, #Deltaz between Compton event clusters, AM%d",spectrumName.Data(),im),12,0,12);
+		comptonEventsDeltaZpix[im]->GetXaxis()->SetTitleOffset(1.2);
+		comptonEventsDeltaZpix[im]->GetXaxis()->SetTitle(Form("Distance, pixels, AM%d",im));
 		
 		if (makeTimingCalibrationStuff)
 		{
-			anodeTimingTwoPixelClustersCorr[im] = new TH2F(Form("anodeTimingTwoPixelClustersCorr_AM%d",im),Form("%s, Correlation between triggered pixel anode timing, two triggered pixel clusters only, AM%d",spectrumName.Data(),im),nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H);
-			anodeTimingTwoPixelClustersCorr[im]->GetXaxis()->SetTitleOffset(1.2);
-			anodeTimingTwoPixelClustersCorr[im]->GetXaxis()->SetTitle(Form("Anode timing, first pixel, ns, AM%d",im));	
-			anodeTimingTwoPixelClustersCorr[im]->GetYaxis()->SetTitleOffset(1.4);
-			anodeTimingTwoPixelClustersCorr[im]->GetYaxis()->SetTitle(Form("Anode timing, second pixel, ns, AM%d",im));	
-
 			if (!doNotUseCornerPixelsInPixelClusterCOGEneg) 
 			{
-				anodeTimingDiff2PixDiagClusters[im] = new TH1F(Form("anodeTimingDiff2PixDiagClusters_AM%d",im),Form("%s, Difference in triggered pixel anode timing, two triggered diagonal pixel clusters only, AM%d",spectrumName.Data(),im),nBinsDeltaRawTiming4H,minDeltaRawTiming4H,maxDeltaRawTiming4H);
+				anodeTimingDiff2PixDiagClusters[im] = new TH1F(Form("anodeTimingDiff2PixDiagClusters_AM%d",im),Form("%s, Difference in triggered pixel anode timing, two triggered diagonal pixel clusters only, AM%d",spectrumName.Data(),im),nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H);
 				anodeTimingDiff2PixDiagClusters[im]->GetXaxis()->SetTitleOffset(1.2);
 				anodeTimingDiff2PixDiagClusters[im]->GetXaxis()->SetTitle(Form("Anode timing difference between pixels, ns, AM%d",im));	
 			
@@ -1102,41 +1168,64 @@ int main()
 				anodeTiming2PixDiagClustersCorr[im]->GetYaxis()->SetTitle(Form("Anode timing, second pixel, ns, AM%d",im));	
 			}
 			
-			anodeTimingDiff2PixClusters[im] = new TH1F(Form("anodeTimingDiff2PixClusters_AM%d",im),Form("%s, Difference in triggered pixel anode timing, two triggered pixel clusters only, AM%d",spectrumName.Data(),im),nBinsDeltaAnodeTiming4H,minDeltaAnodeTiming4H,maxDeltaAnodeTiming4H);
+			anodeTimingDiff2PixClusters[im] = new TH1F(Form("anodeTimingDiff2PixClusters_AM%d",im),Form("%s, Difference in triggered pixel anode timing, 2-pix clusters only, before cut on #Deltat, AM%d",spectrumName.Data(),im),nBinsDeltaAnodeTiming4H,minDeltaAnodeTiming4H,maxDeltaAnodeTiming4H);
 			anodeTimingDiff2PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
 			anodeTimingDiff2PixClusters[im]->GetXaxis()->SetTitle(Form("Anode timing difference between pixels, ns, AM%d",im));	
-
-			anodeTimingDiff3PixClusters[im] = new TH1F(Form("anodeTimingDiff3PixClusters_AM%d",im),Form("%s, Difference in triggered pixel anode timing, three and more triggered pixel clusters only, AM%d",spectrumName.Data(),im),nBinsDeltaAnodeTiming4H,minDeltaAnodeTiming4H,maxDeltaAnodeTiming4H);
-			anodeTimingDiff3PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
-			anodeTimingDiff3PixClusters[im]->GetXaxis()->SetTitle(Form("Anode timing difference between pixels, ns, AM%d",im));	
 			
 			anodeTimingDiffAllClusters[im] = new TH1F(Form("anodeTimingDiffAllClusters_AM%d",im),Form("%s, Difference in triggered pixel anode timing, all clusters, AM%d",spectrumName.Data(),im),nBinsDeltaAnodeTiming4H,minDeltaAnodeTiming4H,maxDeltaAnodeTiming4H);
 			anodeTimingDiffAllClusters[im]->GetXaxis()->SetTitleOffset(1.2);
 			anodeTimingDiffAllClusters[im]->GetXaxis()->SetTitle(Form("Anode timing difference between pixels, ns, AM%d",im));	
+			
+			if (enableUpdateEnergyClusters)
+			{
+				dAnodeTiming_vs_nE_1PixelClustersNeigb[im] = new TH2F(Form("dAnodeTiming_vs_nE_1PixelClustersNeigb_AM%d",im),Form("%s, #Deltat(triggered pixel - neighbour) vs its energy, 1-pix clusters only, AM%d",spectrumName.Data(),im),nBinsE,minE,50,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200);
+				dAnodeTiming_vs_nE_1PixelClustersNeigb[im]->GetXaxis()->SetTitleOffset(1.2);
+				dAnodeTiming_vs_nE_1PixelClustersNeigb[im]->GetXaxis()->SetTitle(Form("Neighbour pixel energy, keV, AM%d",im));	
+				dAnodeTiming_vs_nE_1PixelClustersNeigb[im]->GetYaxis()->SetTitleOffset(1.5);
+				dAnodeTiming_vs_nE_1PixelClustersNeigb[im]->GetYaxis()->SetTitle(Form("#Deltat(triggered pixel - neighbour), ns, AM%d",im));	
+				
+				dAnodeTiming_vs_sumE_1PixelClustersNeigb[im] = new TH2F(Form("dAnodeTiming_vs_sumE_1PixelClustersNeigb_AM%d",im),Form("%s, #Deltat(triggered pixel - neighbour) vs  neighbour pixel + triggered pixel energy, 1-pix clusters, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200);
+				dAnodeTiming_vs_sumE_1PixelClustersNeigb[im]->GetXaxis()->SetTitleOffset(1.2);
+				dAnodeTiming_vs_sumE_1PixelClustersNeigb[im]->GetXaxis()->SetTitle(Form("Neighbour pixel + triggered pixel energy, keV, AM%d",im));	
+				dAnodeTiming_vs_sumE_1PixelClustersNeigb[im]->GetYaxis()->SetTitleOffset(1.5);
+				dAnodeTiming_vs_sumE_1PixelClustersNeigb[im]->GetYaxis()->SetTitle(Form("#Deltat(triggered pixel - neighbour), ns, AM%d",im));
+				
+				dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[im] = new TH2F(Form("dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters_AM%d",im),Form("%s, #Deltat(triggered pixel - neighbour) vs neighbour anode timing, 1-pix clusters only, AM%d",spectrumName.Data(),im),nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200);
+				dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+				dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[im]->GetXaxis()->SetTitle(Form("Anode timing, neighbour pixel, ns, AM%d",im));	
+				dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[im]->GetYaxis()->SetTitleOffset(1.5);
+				dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[im]->GetYaxis()->SetTitle(Form("#Deltat(triggered pixel - neighbour), ns, AM%d",im));	
 
-			anodeTimingTwoPixelClustersCorr[im] = new TH2F(Form("anodeTimingTwoPixelClustersCorr_AM%d",im),Form("%s, Correlation between triggered pixel anode timing, two triggered pixel clusters only, AM%d",spectrumName.Data(),im),nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H);
-			anodeTimingTwoPixelClustersCorr[im]->GetXaxis()->SetTitleOffset(1.2);
-			anodeTimingTwoPixelClustersCorr[im]->GetXaxis()->SetTitle(Form("Anode timing, first pixel, ns, AM%d",im));	
-			anodeTimingTwoPixelClustersCorr[im]->GetYaxis()->SetTitleOffset(1.4);
-			anodeTimingTwoPixelClustersCorr[im]->GetYaxis()->SetTitle(Form("Anode timing, second pixel, ns, AM%d",im));	
+				anodeTiming1PixelClustersNeigbCorr[im] = new TH2F(Form("anodeTiming1PixelClustersNeigbCorr_AM%d",im),Form("%s, Correlation between triggered pixel anode timing and its neighbours, 1-pix clusters only, AM%d",spectrumName.Data(),im),nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200);
+				anodeTiming1PixelClustersNeigbCorr[im]->GetXaxis()->SetTitleOffset(1.2);
+				anodeTiming1PixelClustersNeigbCorr[im]->GetXaxis()->SetTitle(Form("Anode timing, main pixel, ns, AM%d",im));	
+				anodeTiming1PixelClustersNeigbCorr[im]->GetYaxis()->SetTitleOffset(1.5);
+				anodeTiming1PixelClustersNeigbCorr[im]->GetYaxis()->SetTitle(Form("Anode timing, neighbour pixel, ns, AM%d",im));	
 
+				anodeTiming2PixelClustersNeigbCorr[im] = new TH2F(Form("anodeTiming2PixelClustersNeigbCorr_AM%d",im),Form("%s, Correlation between triggered pixel anode timing and its neighbours, 2-pix clusters only, AM%d",spectrumName.Data(),im),nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200);
+				anodeTiming2PixelClustersNeigbCorr[im]->GetXaxis()->SetTitleOffset(1.2);
+				anodeTiming2PixelClustersNeigbCorr[im]->GetXaxis()->SetTitle(Form("Anode timing, main pixel, ns, AM%d",im));	
+				anodeTiming2PixelClustersNeigbCorr[im]->GetYaxis()->SetTitleOffset(1.5);
+				anodeTiming2PixelClustersNeigbCorr[im]->GetYaxis()->SetTitle(Form("Anode timing, neighbour pixel, ns, AM%d",im));
+				
+				anodeTimingNeigb_nE_1PixelClusters[im] = new TH2F(Form("anodeTimingNeigb_nE_1PixelClusters_AM%d",im),Form("%s, Correlation between neighbour energy and anode timing, 1-pix clusters only, AM%d",spectrumName.Data(),im),nBinsE,minE,50,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200);
+				anodeTimingNeigb_nE_1PixelClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+				anodeTimingNeigb_nE_1PixelClusters[im]->GetXaxis()->SetTitle(Form("Neighbour energy, AM%d, keV",im));	
+				anodeTimingNeigb_nE_1PixelClusters[im]->GetYaxis()->SetTitleOffset(1.5);
+				anodeTimingNeigb_nE_1PixelClusters[im]->GetYaxis()->SetTitle(Form("Anode timing, neighbour pixel, ns, AM%d",im));	
+				
+				anodeTimingNeigb_nE_2PixelClusters[im] = new TH2F(Form("anodeTimingNeigb_nE_2PixelClusters_AM%d",im),Form("%s, Correlation between neighbour energy and anode timing, 2-pix clusters only, AM%d",spectrumName.Data(),im),nBinsE,minE,50,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H+200);
+				anodeTimingNeigb_nE_2PixelClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+				anodeTimingNeigb_nE_2PixelClusters[im]->GetXaxis()->SetTitle(Form("Neighbour energy, AM%d, keV",im));	
+				anodeTimingNeigb_nE_2PixelClusters[im]->GetYaxis()->SetTitleOffset(1.5);
+				anodeTimingNeigb_nE_2PixelClusters[im]->GetYaxis()->SetTitle(Form("Anode timing, neighbour pixel, ns, AM%d",im));					
+			}
+			
 			anodeTiming2PixClustersCorr[im] = new TH2F(Form("anodeTiming2PixClustersCorr_AM%d",im),Form("%s, Correlation between triggered pixel anode timing, two triggered pixel clusters only, AM%d",spectrumName.Data(),im),nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H);
 			anodeTiming2PixClustersCorr[im]->GetXaxis()->SetTitleOffset(1.2);
 			anodeTiming2PixClustersCorr[im]->GetXaxis()->SetTitle(Form("Anode timing, first pixel, ns, AM%d",im));	
 			anodeTiming2PixClustersCorr[im]->GetYaxis()->SetTitleOffset(1.4);
 			anodeTiming2PixClustersCorr[im]->GetYaxis()->SetTitle(Form("Anode timing, second pixel, ns, AM%d",im));	
-
-			anodeTiming3PixClustersCorr[im] = new TH2F(Form("anodeTiming3PixClustersCorr_AM%d",im),Form("%s, Correlation between triggered pixel anode timing, two triggered pixel clusters only, AM%d",spectrumName.Data(),im),nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H);
-			anodeTiming3PixClustersCorr[im]->GetXaxis()->SetTitleOffset(1.2);
-			anodeTiming3PixClustersCorr[im]->GetXaxis()->SetTitle(Form("Anode timing, first pixel, ns, AM%d",im));	
-			anodeTiming3PixClustersCorr[im]->GetYaxis()->SetTitleOffset(1.4);
-			anodeTiming3PixClustersCorr[im]->GetYaxis()->SetTitle(Form("Anode timing, second pixel, ns, AM%d",im));
-			
-			anodeTimingTwoClustersAMCorr[im] = new TH2F(Form("anodeTimingTwoClustersAMCorr_AM%d",im),Form("%s, Correlation between cluster anode timing, two cluster events only, AM%d",spectrumName.Data(),im),nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H,nBinsAnodeTiming4H,minAnodeTiming4H,maxAnodeTiming4H);
-			anodeTimingTwoClustersAMCorr[im]->GetXaxis()->SetTitleOffset(1.2);
-			anodeTimingTwoClustersAMCorr[im]->GetXaxis()->SetTitle(Form("Anode timing, first cluster, ns, AM%d",im));	
-			anodeTimingTwoClustersAMCorr[im]->GetYaxis()->SetTitleOffset(1.4);
-			anodeTimingTwoClustersAMCorr[im]->GetYaxis()->SetTitle(Form("Anode timing, second cluster, ns, AM%d",im));
 
 			dAnodeTiming_vs_theta[im] = new TH2F(Form("dAnodeTiming_vs_theta_AM%d",im),Form("%s, #Delta(two cluster anode timings) vs scattering angle, two cluster events only, AM%d",spectrumName.Data(),im),nBinsTheta4H,0,180,100,-500,500);
 			dAnodeTiming_vs_theta[im]->GetXaxis()->SetTitleOffset(1.2);
@@ -1154,160 +1243,186 @@ int main()
 			dAnodeTiming_vs_E2[im]->GetXaxis()->SetTitleOffset(1.2);
 			dAnodeTiming_vs_E2[im]->GetXaxis()->SetTitle(Form("Second cluster energy, AM%d, keV",im));
 			dAnodeTiming_vs_E2[im]->GetYaxis()->SetTitleOffset(1.5);
-			dAnodeTiming_vs_E2[im]->GetYaxis()->SetTitle(Form("#Delta(Anode timing) = t_{1} - t_{2}, ns, AM%d",im));
+			dAnodeTiming_vs_E2[im]->GetYaxis()->SetTitle(Form("#Delta(Anode timing), ns, AM%d",im));
 			
-			dAnodeTiming_vs_E12[im] = new TH2F(Form("dAnodeTiming_vs_E12_AM%d",im),Form("%s, #Delta(Anode timing) vs 'second' cluster energy, two cluster events only, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,100,-500,500);
+			dAnodeTiming_vs_E12[im] = new TH2F(Form("dAnodeTiming_vs_E12_AM%d",im),Form("%s, #Delta(Anode timing) = t_{1} - t_{2} vs both cluster energies, two cluster events only, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,100,-500,500);
 			dAnodeTiming_vs_E12[im]->GetXaxis()->SetTitleOffset(1.2);
-			dAnodeTiming_vs_E12[im]->GetXaxis()->SetTitle(Form("'Second' cluster energy, AM%d, keV",im));
+			dAnodeTiming_vs_E12[im]->GetXaxis()->SetTitle(Form("Cluster energy, AM%d, keV",im));
 			dAnodeTiming_vs_E12[im]->GetYaxis()->SetTitleOffset(1.5);
 			dAnodeTiming_vs_E12[im]->GetYaxis()->SetTitle(Form("#Delta(Anode timing), ns, AM%d",im));
 			
-			dAnodeTimingAbs_vs_E12[im] = new TH2F(Form("dAnodeTimingAbs_vs_E12_AM%d",im),Form("%s, |#Delta(Anode timing)| vs 'second' cluster energy, two cluster events only, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,100,0,500);
+			dAnodeTimingAbs_vs_E12[im] = new TH2F(Form("dAnodeTimingAbs_vs_E12_AM%d",im),Form("%s, |#Delta(Anode timing)| vs both cluster energies, two cluster events only, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,100,0,500);
 			dAnodeTimingAbs_vs_E12[im]->GetXaxis()->SetTitleOffset(1.2);
-			dAnodeTimingAbs_vs_E12[im]->GetXaxis()->SetTitle(Form("'Second' cluster energy, AM%d, keV",im));
+			dAnodeTimingAbs_vs_E12[im]->GetXaxis()->SetTitle(Form("Cluster energy, AM%d, keV",im));
 			dAnodeTimingAbs_vs_E12[im]->GetYaxis()->SetTitleOffset(1.5);
 			dAnodeTimingAbs_vs_E12[im]->GetYaxis()->SetTitle(Form("|#Delta(Anode timing)|, ns, AM%d",im));
-			
-			dist12_vs_E1[im] = new TH2F(Form("dist12_vs_E1_AM%d",im),Form("%s, 'Distance 1-2' vs first cluster energy, two cluster events only, AM%d",spectrumName.Data(),im),nBinsE,minE,2e5,100,0,11);
-			dist12_vs_E1[im]->GetXaxis()->SetTitleOffset(1.2);
-			dist12_vs_E1[im]->GetXaxis()->SetTitle(Form("First cluster energy, AM%d, keV",im));
-			dist12_vs_E1[im]->GetYaxis()->SetTitleOffset(1.5);
-			dist12_vs_E1[im]->GetYaxis()->SetTitle(Form("'Distance 1-2', 'mm', AM%d",im));
-			
-			dist12_vs_E2[im] = new TH2F(Form("dist12_vs_E2_AM%d",im),Form("%s, 'Distance 1-2' vs second cluster energy, two cluster events only, AM%d",spectrumName.Data(),im),nBinsE,minE,5e5,100,0,11);
-			dist12_vs_E2[im]->GetXaxis()->SetTitleOffset(1.2);
-			dist12_vs_E2[im]->GetXaxis()->SetTitle(Form("Second cluster energy, AM%d, keV",im));
-			dist12_vs_E2[im]->GetYaxis()->SetTitleOffset(1.5);
-			dist12_vs_E2[im]->GetYaxis()->SetTitle(Form("'Distance 1-2', 'mm', AM%d",im));
-			
-			dist12_vs_E12[im] = new TH2F(Form("dist12_vs_E12_AM%d",im),Form("%s, 'Distance 1-2' vs 'second' cluster energy, two cluster events only, AM%d",spectrumName.Data(),im),nBinsE,minE,5e5,100,0,11);
-			dist12_vs_E12[im]->GetXaxis()->SetTitleOffset(1.2);
-			dist12_vs_E12[im]->GetXaxis()->SetTitle(Form("'Second' cluster energy, AM%d, keV",im));
-			dist12_vs_E12[im]->GetYaxis()->SetTitleOffset(1.5);
-			dist12_vs_E12[im]->GetYaxis()->SetTitle(Form("'Distance 1-2', 'mm', AM%d",im));
 
-			dist12_over_E12sq[im] = new TH2F(Form("dist12_over_E12sq_AM%d",im),Form("%s, 'Distance 1-2' in #mum over E_{cluster}^{2.2}, two cluster events only, AM%d",spectrumName.Data(),im),100,0,0.08,100,0,0.5);
-			dist12_over_E12sq[im]->GetXaxis()->SetTitleOffset(1.2);
-			dist12_over_E12sq[im]->GetXaxis()->SetTitle(Form("Ratio with E_{1}, AM%d",im));
-			dist12_over_E12sq[im]->GetYaxis()->SetTitleOffset(1.5);
-			dist12_over_E12sq[im]->GetYaxis()->SetTitle(Form("Ratio with E_{2}, AM%d",im));
+			clusterZfromAnodeTiming[im] = new TH1F(Form("clusterZfromAnodeTiming_AM%d",im),Form("%s, Cluster Z-coordinate calculated from anode timing, 1-2-pix clusters, AM%d",spectrumName.Data(),im),nBinsZ,minZ,maxZ);
+			clusterZfromAnodeTiming[im]->GetXaxis()->SetTitleOffset(1.2);
+			clusterZfromAnodeTiming[im]->GetXaxis()->SetTitle(Form("Cluster Z, mm, AM%d",im));			
 		}
+		comptonEventsDeltaZdist[im] = new TH1F(Form("comptonEventsDeltaZdist_AM%d",im),Form("%s, #Deltaz between Compton event clusters using anode timing, AM%d",spectrumName.Data(),im),40,0,10);
+		comptonEventsDeltaZdist[im]->GetXaxis()->SetTitleOffset(1.2);
+		comptonEventsDeltaZdist[im]->GetXaxis()->SetTitle(Form("Distance, mm, AM%d",im));
 		
 		clusterSize[im] = new TH1F(Form("clusterSize_AM%d",im),Form("%s, cluster size, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
 		clusterSize[im]->GetXaxis()->SetTitleOffset(1.4);
-		clusterSize[im]->GetXaxis()->SetTitle(Form("AM%d cluster size, pixels",im));		
+		clusterSize[im]->GetXaxis()->SetTitle(Form("Cluster size, pixels, AM%d",im));		
+		
+		numberOfClusters[im] = new TH1F(Form("numberOfClusters_AM%d",im),Form("%s, number of clusters per event, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
+		numberOfClusters[im]->GetXaxis()->SetTitleOffset(1.4);
+		numberOfClusters[im]->GetXaxis()->SetTitle(Form("Number of clusters/event, AM%d",im));		
 		
 		clusterE_vsSize[im] = new TH2F(Form("clusterE_vsSize_AM%d",im),Form("%s, cluster size vs cluster energy, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
 		clusterE_vsSize[im]->GetXaxis()->SetTitleOffset(1.2);
-		clusterE_vsSize[im]->GetXaxis()->SetTitle(Form("AM%d cluster energy, keV",im));		
+		clusterE_vsSize[im]->GetXaxis()->SetTitle(Form("Cluster energy, keV, AM%d",im));		
 		clusterE_vsSize[im]->GetYaxis()->SetTitleOffset(1.4);
-		clusterE_vsSize[im]->GetYaxis()->SetTitle(Form("AM%d cluster size, pixels",im));		
+		clusterE_vsSize[im]->GetYaxis()->SetTitle(Form("Cluster size, pixels, AM%d",im));			
 		
-		clusterMaxE_vsSize[im] = new TH2F(Form("clusterMaxE_vsSize_AM%d",im),Form("%s, cluster size with maximum energy vs its size, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
+		clusterMaxE_vsSize[im] = new TH2F(Form("clusterMaxE_vsSize_AM%d",im),Form("%s, max energy cluster size vs its size, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
 		clusterMaxE_vsSize[im]->GetXaxis()->SetTitleOffset(1.2);
-		clusterMaxE_vsSize[im]->GetXaxis()->SetTitle(Form("AM%d cluster energy, keV",im));		
+		clusterMaxE_vsSize[im]->GetXaxis()->SetTitle(Form("Cluster energy, keV, AM%d",im));
 		clusterMaxE_vsSize[im]->GetYaxis()->SetTitleOffset(1.4);
-		clusterMaxE_vsSize[im]->GetYaxis()->SetTitle(Form("AM%d cluster size, pixels",im));		
-		
-		clusterSecE_vsSize[im] = new TH2F(Form("clusterSecE_vsSize_AM%d",im),Form("%s, cluster size second in energy vs its size, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
-		clusterSecE_vsSize[im]->GetXaxis()->SetTitleOffset(1.2);
-		clusterSecE_vsSize[im]->GetXaxis()->SetTitle(Form("AM%d cluster energy, keV",im));		
-		clusterSecE_vsSize[im]->GetYaxis()->SetTitleOffset(1.4);
-		clusterSecE_vsSize[im]->GetYaxis()->SetTitle(Form("AM%d cluster size, pixels",im));		
+		clusterMaxE_vsSize[im]->GetYaxis()->SetTitle(Form("Cluster size, pixels, AM%d",im));		
 	
-		clusterSizeMaxE_SecE[im] = new TH2F(Form("clusterSizeMaxE_SecE_AM%d",im),Form("%s, first vs second cluster size, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H,maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
-		clusterSizeMaxE_SecE[im]->GetXaxis()->SetTitleOffset(1.2);
-		clusterSizeMaxE_SecE[im]->GetXaxis()->SetTitle(Form("AM%d first cluster energy, pixels",im));		
-		clusterSizeMaxE_SecE[im]->GetYaxis()->SetTitleOffset(1.4);
-		clusterSizeMaxE_SecE[im]->GetYaxis()->SetTitle(Form("AM%d second cluster size, pixels",im));		
-	
-		clusterE_nTrigs[im] = new TH2F(Form("clusterE_nTrigs_AM%d",im),Form("%s, number of triggers in cluster vs cluster energy, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
-		clusterE_nTrigs[im]->GetXaxis()->SetTitleOffset(1.2);
-		clusterE_nTrigs[im]->GetXaxis()->SetTitle(Form("AM%d cluster energy, keV",im));		
-		clusterE_nTrigs[im]->GetYaxis()->SetTitleOffset(1.4);
-		clusterE_nTrigs[im]->GetYaxis()->SetTitle("Number of triggers in cluster");		
+		clusterSize2ClusterEventsCorr[im] = new TH2F(Form("clusterSize2ClusterEventsCorr_AM%d",im),Form("%s, first vs second cluster size, 2 cluster events, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H,maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
+		clusterSize2ClusterEventsCorr[im]->GetXaxis()->SetTitleOffset(1.2);
+		clusterSize2ClusterEventsCorr[im]->GetXaxis()->SetTitle(Form("First cluster size, pixels, AM%d",im));		
+		clusterSize2ClusterEventsCorr[im]->GetYaxis()->SetTitleOffset(1.4);
+		clusterSize2ClusterEventsCorr[im]->GetYaxis()->SetTitle(Form("Second cluster size, pixels, AM%d",im));		
 		
-		nTrigsInEvent_maxEcluster[im] = new TH2F(Form("nTrigsInEvent_maxEcluster_AM%d",im),Form("%s, number of triggers per event vs cluster with maximum energy, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,maxNTrigs4H_2D-minNTrigs4H_2D,minNTrigs4H_2D,maxNTrigs4H_2D);
-		nTrigsInEvent_maxEcluster[im]->GetXaxis()->SetTitleOffset(1.2);
-		nTrigsInEvent_maxEcluster[im]->GetXaxis()->SetTitle(Form("AM%d cluster energy, keV",im));		
-		nTrigsInEvent_maxEcluster[im]->GetYaxis()->SetTitleOffset(1.4);
-		nTrigsInEvent_maxEcluster[im]->GetYaxis()->SetTitle(Form("Number of trigger in AM%d",im));		
-
 		allClustersSpec[im] = new TH1F(Form("allClustersSpec_AM%d",im),Form("%s, all cluster spectrum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
 		allClustersSpec[im]->GetXaxis()->SetTitleOffset(1.2);
-		allClustersSpec[im]->GetXaxis()->SetTitle(Form("AM%d cluster energy, keV",im));		
+		allClustersSpec[im]->GetXaxis()->SetTitle(Form("Cluster energy, keV, AM%d",im));	
 
+		pixelSpecNeighbour1PixClusters[im] = new TH1F(Form("pixelSpecNeighbour1PixClusters_AM%d",im),Form("%s, energy spectrum of neighbour with maximum energy, single pixel cluster, AM%d",spectrumName.Data(),im),120,0,60);
+		pixelSpecNeighbour1PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+		pixelSpecNeighbour1PixClusters[im]->GetXaxis()->SetTitle(Form("Cluster energy, keV, AM%d",im));	
+		
+		clusterSpec_1ClusterEvents_summed[im] = new TH1F(Form("clusterSpec_1ClusterEvents_summed_AM%d",im),Form("%s, Summed energy spectrum (max neighbour + cluster), 1 cluster events, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+		clusterSpec_1ClusterEvents_summed[im]->GetXaxis()->SetTitleOffset(1.2);
+		clusterSpec_1ClusterEvents_summed[im]->GetXaxis()->SetTitle(Form("Summed energy, keV, AM%d",im));		
+		
+		firstComptonClusterE[im] = new TH1F(Form("firstComptonClusterE_AM%d",im),Form("%s, First Compton cluster spectrum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+		firstComptonClusterE[im]->GetXaxis()->SetTitleOffset(1.2);
+		firstComptonClusterE[im]->GetXaxis()->SetTitle(Form("Energy, keV, AM%d",im));		
+		
+		secondComptonClusterE[im] = new TH1F(Form("secondComptonClusterE_AM%d",im),Form("%s, Second Compton cluster spectrum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+		secondComptonClusterE[im]->GetXaxis()->SetTitleOffset(1.2);
+		secondComptonClusterE[im]->GetXaxis()->SetTitle(Form("Energy, keV, AM%d",im));		
+		
+		clusterSpec_1ClusterEvents[im] = new TH1F(Form("clusterSpec_1ClusterEvents_AM%d",im),Form("%s, unsummed energy spectrum, 1 cluster events, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+		clusterSpec_1ClusterEvents[im]->GetXaxis()->SetTitleOffset(1.2);
+		clusterSpec_1ClusterEvents[im]->GetXaxis()->SetTitle(Form("Unsummed energy, keV, AM%d",im));		
+		
 		cathodeSpecAllEvents[im] = new TH1F(Form("cathodeSpecAllEvents_AM%d",im),Form("%s, cathode spectrum, all evetns, AM%d",spectrumName.Data(),im),200,0,600);
 		cathodeSpecAllEvents[im]->GetXaxis()->SetTitleOffset(1.2);
-		cathodeSpecAllEvents[im]->GetXaxis()->SetTitle(Form("AM%d cathode energy, keV",im));		
+		cathodeSpecAllEvents[im]->GetXaxis()->SetTitle(Form("Cathode energy, keV, AM%d",im));		
 
 		cathodeSpecPair[im] = new TH1F(Form("cathodeSpecPair_AM%d",im),Form("%s, cathode spectrum, Compton pair events, AM%d",spectrumName.Data(),im),200,0,600);
 		cathodeSpecPair[im]->GetXaxis()->SetTitleOffset(1.2);
-		cathodeSpecPair[im]->GetXaxis()->SetTitle(Form("AM%d cathode energy, keV",im));		
+		cathodeSpecPair[im]->GetXaxis()->SetTitle(Form("Cathode energy, keV, AM%d",im));		
 
 		cathodeSpecSelPairs[im] = new TH1F(Form("cathodeSpecSelPairs_AM%d",im),Form("%s, cathode spectrum, selected Compton pair events, AM%d",spectrumName.Data(),im),200,0,600);
 		cathodeSpecSelPairs[im]->GetXaxis()->SetTitleOffset(1.2);
-		cathodeSpecSelPairs[im]->GetXaxis()->SetTitle(Form("AM%d cathode energy, keV",im));		
-
-		singleClusterEventsSpec[im] = new TH1F(Form("singleClusterEventsSpec_AM%d",im),Form("%s, single cluster events, cluster spectum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
-		singleClusterEventsSpec[im]->GetXaxis()->SetTitleOffset(1.2);
-		singleClusterEventsSpec[im]->GetXaxis()->SetTitle(Form("AM%d cluster energy, keV",im));		
-
-		summedClusterEventsSpec[im] = new TH1F(Form("summedClusterEventsSpec_AM%d",im),Form("%s, single cluster events + summed Compton events, cluster spectum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
-		summedClusterEventsSpec[im]->GetXaxis()->SetTitleOffset(1.2);
-		summedClusterEventsSpec[im]->GetXaxis()->SetTitle(Form("AM%d cluster energy, keV",im));		
-
-		comptonSpecClusters[im] = new TH1F(Form("comptonSpecClusters_AM%d",im),Form("%s, unsummed Compton interaction cluster spectrum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
-		comptonSpecClusters[im]->GetXaxis()->SetTitleOffset(1.2);
-		comptonSpecClusters[im]->GetXaxis()->SetTitle(Form("AM%d cluster energy, keV",im));		
+		cathodeSpecSelPairs[im]->GetXaxis()->SetTitle(Form("Cathode energy, keV, AM%d",im));		
 
 		comptonSpec2ClustersCorr[im] = new TH2F(Form("comptonSpec2ClustersCorr_AM%d",im),Form("%s, unsummed Compton interactions, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,nBinsE,minE,maxE);
 		comptonSpec2ClustersCorr[im]->GetXaxis()->SetTitleOffset(1.2);
-		comptonSpec2ClustersCorr[im]->GetXaxis()->SetTitle(Form("AM%d first cluster energy, keV",im));		
+		comptonSpec2ClustersCorr[im]->GetXaxis()->SetTitle(Form("First cluster energy, keV, AM%d",im));		
 		comptonSpec2ClustersCorr[im]->GetYaxis()->SetTitleOffset(1.4);
-		comptonSpec2ClustersCorr[im]->GetYaxis()->SetTitle(Form("AM%d second cluster energy, keV",im));		
+		comptonSpec2ClustersCorr[im]->GetYaxis()->SetTitle(Form("Second cluster energy, keV, AM%d",im));		
 
-		comptonHitsSpecClustersSizeCorr[im] = new TH2F(Form("comptonHitsSpecClustersSizeCorr_AM%d",im),Form("%s, unsummed Compton interactions, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H,maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
-		comptonHitsSpecClustersSizeCorr[im]->GetXaxis()->SetTitleOffset(1.2);
-		comptonHitsSpecClustersSizeCorr[im]->GetXaxis()->SetTitle(Form("AM%d first cluster size, pixels",im));	
-		comptonHitsSpecClustersSizeCorr[im]->GetYaxis()->SetTitleOffset(1.4);
-		comptonHitsSpecClustersSizeCorr[im]->GetYaxis()->SetTitle(Form("AM%d second cluster size, pixels",im));				
+		clusterSpec2ClusterEventsCorr[im] = new TH2F(Form("clusterSpec2ClusterEventsCorr_AM%d",im),Form("%s, cluster energies, two cluster events, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,nBinsE,minE,maxE);
+		clusterSpec2ClusterEventsCorr[im]->GetXaxis()->SetTitleOffset(1.2);
+		clusterSpec2ClusterEventsCorr[im]->GetXaxis()->SetTitle(Form("First cluster energy, keV, AM%d",im));		
+		clusterSpec2ClusterEventsCorr[im]->GetYaxis()->SetTitleOffset(1.4);
+		clusterSpec2ClusterEventsCorr[im]->GetYaxis()->SetTitle(Form("Second cluster energy, keV, AM%d",im));		
 
 		firstComptonClusterSize[im] = new TH1F(Form("firstComptonClusterSize_AM%d",im),Form("%s, cluster size of first Compton cluster, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
 		firstComptonClusterSize[im]->GetXaxis()->SetTitleOffset(1.4);
-		firstComptonClusterSize[im]->GetXaxis()->SetTitle(Form("AM%d cluster size, pixels",im));		
+		firstComptonClusterSize[im]->GetXaxis()->SetTitle(Form("Cluster size, pixels, AM%d",im));		
 
 		secondComptonClusterSize[im] = new TH1F(Form("secondComptonClusterSize_AM%d",im),Form("%s, cluster size of second Compton cluster, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
 		secondComptonClusterSize[im]->GetXaxis()->SetTitleOffset(1.4);
-		secondComptonClusterSize[im]->GetXaxis()->SetTitle(Form("AM%d cluster size, pixels",im));		
+		secondComptonClusterSize[im]->GetXaxis()->SetTitle(Form("Cluster size, pixels, AM%d",im));	
 
-		firstComptonClusterSizeSelEvents[im] = new TH1F(Form("firstComptonClusterSizeSelEvents_AM%d",im),Form("%s, cluster size of first Compton cluster, selected events, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
+		firstComptonClusterSizeSelEvents[im] = new TH1F(Form("firstComptonClusterSizeSelEvents_AM%d",im),Form("%s, cluster size of first Compton cluster, #Delta#theta selected events, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
 		firstComptonClusterSizeSelEvents[im]->GetXaxis()->SetTitleOffset(1.4);
-		firstComptonClusterSizeSelEvents[im]->GetXaxis()->SetTitle(Form("AM%d cluster size, pixels",im));		
+		firstComptonClusterSizeSelEvents[im]->GetXaxis()->SetTitle(Form("Cluster size, pixels, AM%d",im));		
 
-		secondComptonClusterSizeSelEvents[im] = new TH1F(Form("secondComptonClusterSizeSelEvents_AM%d",im),Form("%s, cluster size of second Compton cluster, selected events, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
+		secondComptonClusterSizeSelEvents[im] = new TH1F(Form("secondComptonClusterSizeSelEvents_AM%d",im),Form("%s, cluster size of second Compton cluster, #Delta#theta selected events, AM%d",spectrumName.Data(),im),maxClusterSize4H-minClusterSize4H,minClusterSize4H,maxClusterSize4H);
 		secondComptonClusterSizeSelEvents[im]->GetXaxis()->SetTitleOffset(1.4);
-		secondComptonClusterSizeSelEvents[im]->GetXaxis()->SetTitle(Form("AM%d cluster size, pixels",im));		
+		secondComptonClusterSizeSelEvents[im]->GetXaxis()->SetTitle(Form("Cluster size, pixels, AM%d",im));		
 		
-		comptonHitsClusters_nTrigsCorr[im] = new TH2F(Form("comptonHitsClusters_nTrigsCorr_AM%d",im),Form("%s, unsummed Compton interactions, AM%d",spectrumName.Data(),im),maxNTrigs4H_2D-minNTrigs4H_2D,minNTrigs4H_2D,maxNTrigs4H_2D,maxNTrigs4H_2D-minNTrigs4H_2D,minNTrigs4H_2D,maxNTrigs4H_2D);
-		comptonHitsClusters_nTrigsCorr[im]->GetXaxis()->SetTitleOffset(1.2);
-		comptonHitsClusters_nTrigsCorr[im]->GetXaxis()->SetTitle(Form("Number of triggers in first cluster, AM%d",im));	
-		comptonHitsClusters_nTrigsCorr[im]->GetYaxis()->SetTitleOffset(1.4);
-		comptonHitsClusters_nTrigsCorr[im]->GetYaxis()->SetTitle(Form("Number of triggers in second cluster, AM%d",im));		
+		if (enableUpdateEnergyClusters)
+		{
+			comptonSpecClusters[im] = new TH1F(Form("comptonSpecClusters_AM%d",im),Form("%s, unsummed Compton interaction cluster spectrum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+			comptonSpecClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+			comptonSpecClusters[im]->GetXaxis()->SetTitle(Form("Cluster energy, keV, AM%d",im));		
+
+			comptonSummedSpec2Clusters[im] = new TH1F(Form("comptonSummedSpec2Clusters_AM%d",im),Form("%s, two interaction summed Compton spectrum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+			comptonSummedSpec2Clusters[im]->GetXaxis()->SetTitleOffset(1.2);
+			comptonSummedSpec2Clusters[im]->GetXaxis()->SetTitle(Form("Summed event energy, keV, AM%d",im));		
+			
+			comptonSummedSpec2Clusters_1PixClusters[im] = new TH1F(Form("comptonSummedSpec2Clusters_1PixClusters_AM%d",im),Form("%s, two interaction summed Compton spectrum, 1-pix clusters, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+			comptonSummedSpec2Clusters_1PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+			comptonSummedSpec2Clusters_1PixClusters[im]->GetXaxis()->SetTitle(Form("Summed event energy, keV, AM%d",im));		
+			
+			comptonSummedSpec2Clusters_2PixClusters[im] = new TH1F(Form("comptonSummedSpec2Clusters_2PixClusters_AM%d",im),Form("%s, two interaction summed Compton spectrum, 2-pix clusters, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+			comptonSummedSpec2Clusters_2PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+			comptonSummedSpec2Clusters_2PixClusters[im]->GetXaxis()->SetTitle(Form("Summed event energy, keV, AM%d",im));		
+			
+			comptonSummedSpec2Clusters_1_2PixClusters[im] = new TH1F(Form("comptonSummedSpec2Clusters_1_2PixClusters_AM%d",im),Form("%s, two interaction summed Compton spectrum, 1-2-pix clusters, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+			comptonSummedSpec2Clusters_1_2PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+			comptonSummedSpec2Clusters_1_2PixClusters[im]->GetXaxis()->SetTitle(Form("Summed event energy, keV, AM%d",im));		
 		
-		comptonSummedSpec2Clusters[im] = new TH1F(Form("comptonSummedSpec2Clusters_AM%d",im),Form("%s, two interaction summed Compton spectrum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
-		comptonSummedSpec2Clusters[im]->GetXaxis()->SetTitleOffset(1.2);
-		comptonSummedSpec2Clusters[im]->GetXaxis()->SetTitle(Form("AM%d summed cluster energy, keV",im));		
+			energySpecCorr1PixClusters[im] = new TH2F(Form("energySpecCorr1PixClusters_AM%d",im),Form("%s, single pixel cluster energy vs neighbour pixel energy, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,120,0,60);
+			energySpecCorr1PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+			energySpecCorr1PixClusters[im]->GetXaxis()->SetTitle(Form("Cluster energy, keV, AM%d",im));		
+			energySpecCorr1PixClusters[im]->GetYaxis()->SetTitleOffset(1.4);
+			energySpecCorr1PixClusters[im]->GetYaxis()->SetTitle(Form("Neighbour pixel energy, keV, AM%d",im));		
 		
-		comptonSummedSpecEventClusters[im] = new TH1F(Form("comptonSummedSpecEventClusters_AM%d",im),Form("%s, summed Compton spectrum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
-		comptonSummedSpecEventClusters[im]->GetXaxis()->SetTitleOffset(1.2);
-		comptonSummedSpecEventClusters[im]->GetXaxis()->SetTitle(Form("AM%d summed cluster energy, keV",im));		
+			energySpecCorr2PixClusters[im] = new TH2F(Form("energySpecCorr2PixClusters_AM%d",im),Form("%s, two pixel cluster energy vs total neighbours pixel energy, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE,120,0,60);
+			energySpecCorr2PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+			energySpecCorr2PixClusters[im]->GetXaxis()->SetTitle(Form("Cluster energy, keV, AM%d",im));		
+			energySpecCorr2PixClusters[im]->GetYaxis()->SetTitleOffset(1.4);
+			energySpecCorr2PixClusters[im]->GetYaxis()->SetTitle(Form("Total neighbour pixel energy, keV, AM%d",im));
+
+			clusterSummingStats1PixClusters[im] = new TH1F(Form("clusterSummingStats1PixClusters_AM%d",im),Form("%s, cluster summing statistics, 1-pix clusters, AM%d",spectrumName.Data(),im),5,0,5);
+			clusterSummingStats1PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+			clusterSummingStats1PixClusters[im]->GetXaxis()->SetTitle(Form("Number of neighbours added, AM%d",im));		
+
+			clusterSummingStats2PixClusters[im] = new TH1F(Form("clusterSummingStats2PixClusters_AM%d",im),Form("%s, cluster summing statistics, 2-pix clusters, AM%d",spectrumName.Data(),im),5,0,5);
+			clusterSummingStats2PixClusters[im]->GetXaxis()->SetTitleOffset(1.2);
+			clusterSummingStats2PixClusters[im]->GetXaxis()->SetTitle(Form("Number of neighbours added, AM%d",im));		
+		}
+		
+		comptonSummedSpec2Clusters_Eunsummed[im] = new TH1F(Form("comptonSummedSpec2Clusters_Eunsummed_AM%d",im),Form("%s, two interaction summed Compton spectrum, unsummed clusters, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+		comptonSummedSpec2Clusters_Eunsummed[im]->GetXaxis()->SetTitleOffset(1.2);
+		comptonSummedSpec2Clusters_Eunsummed[im]->GetXaxis()->SetTitle(Form("Summed event energy, keV, AM%d",im));		
+		
+		comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im] = new TH1F(Form("comptonSummedSpec2Clusters_1PixClusters_Eunsummed_AM%d",im),Form("%s, two interaction summed Compton spectrum, 1-pix unsummed clusters, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+		comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetXaxis()->SetTitleOffset(1.2);
+		comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetXaxis()->SetTitle(Form("Summed event energy, keV, AM%d",im));		
+		
+		comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im] = new TH1F(Form("comptonSummedSpec2Clusters_2PixClusters_Eunsummed_AM%d",im),Form("%s, two interaction summed Compton spectrum, 2-pix unsummed clusters, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+		comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetXaxis()->SetTitleOffset(1.2);
+		comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetXaxis()->SetTitle(Form("Summed event energy, keV, AM%d",im));			
+		
+		comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im] = new TH1F(Form("comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed_AM%d",im),Form("%s, two interaction summed Compton spectrum, 1-2-pix unsummed clusters, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+		comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetXaxis()->SetTitleOffset(1.2);
+		comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetXaxis()->SetTitle(Form("Summed event energy, keV, AM%d",im));			
+
+		comptonSpecClusters_Eunsummed[im] = new TH1F(Form("comptonSpecClusters_Eunsummed_AM%d",im),Form("%s, unsummed Compton interaction cluster spectrum, AM%d",spectrumName.Data(),im),nBinsE,minE,maxE);
+		comptonSpecClusters_Eunsummed[im]->GetXaxis()->SetTitleOffset(1.2);
+		comptonSpecClusters_Eunsummed[im]->GetXaxis()->SetTitle(Form("Unsummed cluster energy, keV, AM%d",im));		
 		
 		phiAngle[im] = new TH1F(Form("phiAngle_AM%d",im),Form("%s, cluster azimuthal angle, AM%d",spectrumName.Data(),im),360,0,360);
 		phiAngle[im]->GetXaxis()->SetTitleOffset(1.2);
 		phiAngle[im]->GetXaxis()->SetTitle(Form("#varphi AM%d, degrees",im));
 
-		phiAngleSelEvents[im] = new TH1F(Form("phiAngleSelEvents_AM%d",im),Form("%s, cluster azimuthal angle, selected events, AM%d",spectrumName.Data(),im),360,0,360);
+		phiAngleSelEvents[im] = new TH1F(Form("phiAngleSelEvents_AM%d",im),Form("%s, cluster azimuthal angle, selected events, #Delta#theta selected events, AM%d",spectrumName.Data(),im),360,0,360);
 		phiAngleSelEvents[im]->GetXaxis()->SetTitleOffset(1.2);
 		phiAngleSelEvents[im]->GetXaxis()->SetTitle(Form("#varphi AM%d, degrees",im));
 		
@@ -1366,77 +1481,111 @@ int main()
 		secondComptonCluster[im]->GetYaxis()->SetTitleOffset(1.4);
 	}
 	
-	singleClusterSpecCorr = new TH2F("singleClusterSpecCorr",Form("%s, energy spectra of single cluster events in AMs",spectrumName.Data()),nBinsE,minE,maxE,nBinsE,minE,maxE);
-	singleClusterSpecCorr->GetXaxis()->SetTitleOffset(1.2);
-	singleClusterSpecCorr->GetXaxis()->SetTitle("AM0 cluster energy, keV");
-	singleClusterSpecCorr->GetYaxis()->SetTitleOffset(1.4);
-	singleClusterSpecCorr->GetYaxis()->SetTitle("AM1 cluster energy, keV");
-	
-	summedClusterSpecCorr = new TH2F("summedClusterSpecCorr",Form("%s, energy spectra of single cluster events and summed Compton events in AMs",spectrumName.Data()),nBinsE,minE,maxE,nBinsE,minE,maxE);
-	summedClusterSpecCorr->GetXaxis()->SetTitleOffset(1.2);
-	summedClusterSpecCorr->GetXaxis()->SetTitle("AM0 cluster energy, keV");
-	summedClusterSpecCorr->GetYaxis()->SetTitleOffset(1.4);
-	summedClusterSpecCorr->GetYaxis()->SetTitle("AM1 cluster energy, keV");
-	
+	comptonSummedSpec2Clusters2Heads = new TH1F("comptonSummedSpec2Clusters2Heads",Form("%s, two interaction summed Compton spectrum, sum of two heads",spectrumName.Data()),nBinsE*2,minE,maxE*2);
+	comptonSummedSpec2Clusters2Heads->GetXaxis()->SetTitleOffset(1.2);
+	comptonSummedSpec2Clusters2Heads->GetXaxis()->SetTitle("Summed total event energy, keV");		
+		
 	comptonSummedSpec2ClustersCorr = new TH2F("comptonSummedSpec2ClustersCorr",Form("%s, two interaction summed Compton spectra in AMs",spectrumName.Data()),nBinsE,minE,maxE,nBinsE,minE,maxE);
 	comptonSummedSpec2ClustersCorr->GetXaxis()->SetTitleOffset(1.2);
 	comptonSummedSpec2ClustersCorr->GetXaxis()->SetTitle("AM0 summed cluster energy, keV");
 	comptonSummedSpec2ClustersCorr->GetYaxis()->SetTitleOffset(1.4);
-	comptonSummedSpec2ClustersCorr->GetYaxis()->SetTitle("AM1 summed cluster energy, keV");
+	comptonSummedSpec2ClustersCorr->GetYaxis()->SetTitle("AM1 summed cluster energy, keV");	
 	
-	comptonSummedSpecEventCorr = new TH2F("comptonSummedSpecEventCorr",Form("%s, summed Compton spectra in AMs",spectrumName.Data()),nBinsE,minE,maxE,nBinsE,minE,maxE);
-	comptonSummedSpecEventCorr->GetXaxis()->SetTitleOffset(1.2);
-	comptonSummedSpecEventCorr->GetXaxis()->SetTitle("AM0 summed cluster energy, keV");
-	comptonSummedSpecEventCorr->GetYaxis()->SetTitleOffset(1.4);
-	comptonSummedSpecEventCorr->GetYaxis()->SetTitle("AM1 summed cluster energy, keV");
-	
-	nClustersInEventCorr = new TH2F("nClustersInEventCorr",Form("%s, number of clusters/event in AMs",spectrumName.Data()),maxNTrigs4H_2D-minNTrigs4H_2D,minNTrigs4H_2D,maxNTrigs4H_2D,maxNTrigs4H_2D-minNTrigs4H_2D,minNTrigs4H_2D,maxNTrigs4H_2D);
-	nClustersInEventCorr->GetXaxis()->SetTitleOffset(1.2);
-	nClustersInEventCorr->GetXaxis()->SetTitle("Number of clusters in AM0");
-	nClustersInEventCorr->GetYaxis()->SetTitleOffset(1.4);
-	nClustersInEventCorr->GetYaxis()->SetTitle("Number of clusters in AM1");
+	comptonSummedSpec2ClustersSelEvents2Heads = new TH1F("comptonSummedSpec2ClustersSelEvents2Heads",Form("%s, two interaction summed Compton spectrum, sum of two heads, #Delta#theta selected events",spectrumName.Data()),nBinsE*2,minE,maxE*2);
+	comptonSummedSpec2ClustersSelEvents2Heads->GetXaxis()->SetTitleOffset(1.2);
+	comptonSummedSpec2ClustersSelEvents2Heads->GetXaxis()->SetTitle("Summed total event energy, keV");		
+		
+	comptonSummedSpec2ClustersSelEventsCorr = new TH2F("comptonSummedSpec2ClustersSelEventsCorr",Form("%s, two interaction summed Compton spectra in AMs, #Delta#theta selected events",spectrumName.Data()),nBinsE,minE,maxE,nBinsE,minE,maxE);
+	comptonSummedSpec2ClustersSelEventsCorr->GetXaxis()->SetTitleOffset(1.2);
+	comptonSummedSpec2ClustersSelEventsCorr->GetXaxis()->SetTitle("AM0 summed cluster energy, keV");
+	comptonSummedSpec2ClustersSelEventsCorr->GetYaxis()->SetTitleOffset(1.4);
+	comptonSummedSpec2ClustersSelEventsCorr->GetYaxis()->SetTitle("AM1 summed cluster energy, keV");	
 
-	nClustersInSelEventCorr = new TH2F("nClustersInSelEventCorr",Form("%s, number of clusters/event in selected events in AMs",spectrumName.Data()),maxNTrigs4H_2D-minNTrigs4H_2D,minNTrigs4H_2D,maxNTrigs4H_2D,maxNTrigs4H_2D-minNTrigs4H_2D,minNTrigs4H_2D,maxNTrigs4H_2D);
-	nClustersInSelEventCorr->GetXaxis()->SetTitleOffset(1.2);
-	nClustersInSelEventCorr->GetXaxis()->SetTitle("Number of clusters in AM0");
-	nClustersInSelEventCorr->GetYaxis()->SetTitleOffset(1.4);
-	nClustersInSelEventCorr->GetYaxis()->SetTitle("Number of clusters in AM1");
+	dPhiXYtAngle = new TH1F("dPhiXYtAngle",Form("%s, #Delta#varphi using X-Y-t #theta window",spectrumName.Data()),nBins_dPhi,-180,180);
+	dPhiXYtAngle->GetXaxis()->SetTitleOffset(1.2);
+	dPhiXYtAngle->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+
+	dPhiXYtAngle_Ewin = new TH1F("dPhiXYtAngle_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiXYtAngle_Ewin->GetXaxis()->SetTitleOffset(1.2);
+	dPhiXYtAngle_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+
+	dPhiXYtAngleNorm = new TH1F("dPhiXYtAngleNorm",Form("%s, #Delta#varphi, normalised at #Delta#varphi = 0, using X-Y-t #theta window",spectrumName.Data()),nBins_dPhi,-180,180);
+	dPhiXYtAngleNorm->GetXaxis()->SetTitleOffset(1.2);
+	dPhiXYtAngleNorm->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+
+	dPhiXYtAngleNorm_Ewin = new TH1F("dPhiXYtAngleNorm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiXYtAngleNorm_Ewin->GetXaxis()->SetTitleOffset(1.2);
+	dPhiXYtAngleNorm_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+
+	dPhiXYtAngle1 = new TH1F("dPhiXYtAngle1",Form("%s, #Delta#varphi using X-Y-t #theta window",spectrumName.Data()),nBins_dPhi/2,0,180);
+	dPhiXYtAngle1->GetXaxis()->SetTitleOffset(1.2);
+	dPhiXYtAngle1->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+
+	dPhiXYtAngle1_Ewin = new TH1F("dPhiXYtAngle1_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi/2,0,180);
+	dPhiXYtAngle1_Ewin->GetXaxis()->SetTitleOffset(1.2);
+	dPhiXYtAngle1_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+
+	dPhiXYtAngle1Norm = new TH1F("dPhiXYtAngle1Norm",Form("%s, #Delta#varphi, normalised at #Delta#varphi = 0, using X-Y-t #theta window",spectrumName.Data()),nBins_dPhi/2,0,180);
+	dPhiXYtAngle1Norm->GetXaxis()->SetTitleOffset(1.2);
+	dPhiXYtAngle1Norm->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+
+	dPhiXYtAngle1Norm_Ewin = new TH1F("dPhiXYtAngle1Norm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi/2,0,180);
+	dPhiXYtAngle1Norm_Ewin->GetXaxis()->SetTitleOffset(1.2);
+	dPhiXYtAngle1Norm_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
 	dPhiAngle = new TH1F("dPhiAngle",Form("%s, #Delta#varphi",spectrumName.Data()),nBins_dPhi,-180,180);
 	dPhiAngle->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngleNorm = new TH1F("dPhiAngleNorm",Form("%s, #Delta#varphi, normalised by #Delta#varphi = 0",spectrumName.Data()),nBins_dPhi,-180,180);
+	dPhiAngle_w = new TH1F("dPhiAngle_w",Form("%s, #Delta#varphi, weighted",spectrumName.Data()),nBins_dPhi,-180,180);
+	dPhiAngle_w->GetXaxis()->SetTitleOffset(1.2);
+	dPhiAngle_w->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+	
+	dPhiAngleNorm = new TH1F("dPhiAngleNorm",Form("%s, #Delta#varphi, normalised at #Delta#varphi = 0",spectrumName.Data()),nBins_dPhi,-180,180);
 	dPhiAngleNorm->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngleNorm->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+	
+	dPhiAngleNorm_w = new TH1F("dPhiAngleNorm_w",Form("%s, #Delta#varphi, normalised at #Delta#varphi = 0, weighted",spectrumName.Data()),nBins_dPhi,-180,180);
+	dPhiAngleNorm_w->GetXaxis()->SetTitleOffset(1.2);
+	dPhiAngleNorm_w->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
 	dPhiAngle1 = new TH1F("dPhiAngle1",Form("%s, |#Delta#varphi|",spectrumName.Data()),nBins_dPhi/2,0,180);
 	dPhiAngle1->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle1->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngle_Ewin = new TH1F("dPhiAngle_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV",spectrumName.Data(),EwindowFor4PhiAnalyis_min,EwindowFor4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiAngle1norm = new TH1F("dPhiAngle1norm",Form("%s, |#Delta#varphi|, normalised at #Delta#varphi = 0",spectrumName.Data()),nBins_dPhi/2,0,180);
+	dPhiAngle1norm->GetXaxis()->SetTitleOffset(1.2);
+	dPhiAngle1norm->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+	
+	dPhiAngle_Ewin = new TH1F("dPhiAngle_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
 	dPhiAngle_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngleNorm_Ewin = new TH1F("dPhiAngleNorm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised by #Delta#varphi = 0",spectrumName.Data(),EwindowFor4PhiAnalyis_min,EwindowFor4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiAngle_Ewin_w = new TH1F("dPhiAngle_Ewin_w",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, weighted",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiAngle_Ewin_w->GetXaxis()->SetTitleOffset(1.2);
+	dPhiAngle_Ewin_w->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+	
+	dPhiAngleNorm_Ewin = new TH1F("dPhiAngleNorm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
 	dPhiAngleNorm_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngleNorm_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngle1_Ewin = new TH1F("dPhiAngle1_Ewin",Form("%s, |#Delta#varphi| within  %.0f keV < E < %.0f keV",spectrumName.Data(),EwindowFor4PhiAnalyis_min,EwindowFor4PhiAnalyis_max),nBins_dPhi/2,0,180);
+	dPhiAngleNorm_Ewin_w = new TH1F("dPhiAngleNorm_Ewin_w",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0, weighted",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiAngleNorm_Ewin_w->GetXaxis()->SetTitleOffset(1.2);
+	dPhiAngleNorm_Ewin_w->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+	
+	dPhiAngle1_Ewin = new TH1F("dPhiAngle1_Ewin",Form("%s, |#Delta#varphi| within  %.0f keV < E < %.0f keV",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi/2,0,180);
 	dPhiAngle1_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle1_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
+	
+	dPhiAngle1norm_Ewin = new TH1F("dPhiAngle1norm_Ewin",Form("%s, |#Delta#varphi| within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi/2,0,180);
+	dPhiAngle1norm_Ewin->GetXaxis()->SetTitleOffset(1.2);
+	dPhiAngle1norm_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
 	dPhiAngle_2ClusterE = new TH2F("dPhiAngle_2ClusterE",Form("%s, #Delta#varphi vs summed energy of two first Compton clusters",spectrumName.Data()),nBinsE,minE,maxE,nBins_dPhi,-180,180);
 	dPhiAngle_2ClusterE->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle_2ClusterE->GetXaxis()->SetTitle("Total summed energy, keV");
 	dPhiAngle_2ClusterE->GetYaxis()->SetTitleOffset(1.4);
 	dPhiAngle_2ClusterE->GetYaxis()->SetTitle("#Delta#varphi, degrees");		
-	
-	dPhiAngle_totalE = new TH2F("dPhiAngle_totalE",Form("%s, #Delta#varphi vs total energy of Compton events",spectrumName.Data()),nBinsE,minE,maxE,nBins_dPhi,-180,180);
-	dPhiAngle_totalE->GetXaxis()->SetTitleOffset(1.2);
-	dPhiAngle_totalE->GetXaxis()->SetTitle("Total energy, keV");
-	dPhiAngle_totalE->GetYaxis()->SetTitleOffset(1.4);
-	dPhiAngle_totalE->GetYaxis()->SetTitle("#Delta#varphi, degrees");		
 	
 	phiAngleCorr = new TH2F("phiAngleCorr",Form("%s, #varphi angle",spectrumName.Data()),36,0,360,36,0,360);
 	phiAngleCorr->GetXaxis()->SetTitleOffset(1.2);
@@ -1462,13 +1611,23 @@ int main()
 	matrix_flags.resize(nPixXY, vector<Int_t>(nPixXY));
 	matrix_E.clear();
 	matrix_E.resize(nPixXY, vector<Float_t>(nPixXY));
+	matrix_Eall.clear();
+	matrix_Eall.resize(nPixXY, vector<Float_t>(nPixXY));
 	matrix_Eneg.clear();
 	matrix_Eneg.resize(nPixXY, vector<Float_t>(nPixXY));
 	matrix_time.clear();
 	matrix_time.resize(nPixXY, vector<Int_t>(nPixXY));
 	matrix_timeCalib.clear();
 	matrix_timeCalib.resize(nPixXY, vector<Float_t>(nPixXY));
-
+	matrix_trigs_4sum.clear();
+	matrix_trigs_4sum.resize(nPixXY, vector<Int_t>(nPixXY));
+	buff_E_neighb_4sum.clear();
+	buff_E_neighb_4sum.resize(0,0);
+	buff_X_neighb_4sum.clear();
+	buff_X_neighb_4sum.resize(0,0);
+	buff_Y_neighb_4sum.clear();
+	buff_Y_neighb_4sum.resize(0,0);
+		
 	UInt_t screen_width = screen_width_def;
 	UInt_t screen_height = screen_height_def;
 	Float_t size_factor = 0.95;
@@ -1493,6 +1652,9 @@ int main()
 			c3->GetPad(curr_Pad)->SetBottomMargin(0.13);
 		}
 	}	
+	line1 = new TLine();
+	line1->SetLineColor(1);
+	line1->SetLineWidth(1);
 	line2 = new TLine();
 	line2->SetLineColor(1);
 	line2->SetLineWidth(3);
@@ -1604,11 +1766,11 @@ int main()
 	//Float_t X_text = 0.68;
 	Float_t Y_text_top = 0.84;
 	Float_t Y_text_step = 0.05;
-
 	Float_t Peak_FWHM_raw = 0, Peak_FWHM_raw_leftEdge = 0, Peak_FWHM_raw_rightEdge = 0, locMaxPeak = 0, locMaxPeakHeight = 0;
 
 	TH1F **nTrigsInEvent_norm = new TH1F*[nAMs];
 	TH1F **clusterSize_norm = new TH1F*[nAMs];
+	TH1F **numberOfClusters_norm = new TH1F*[nAMs];
 	TH1F **nClustersInSelEvent_norm = new TH1F*[nAMs];
 	TH1F **nClustersInEvent_norm = new TH1F*[nAMs];
 	TH1F **firstComptonClusterSize_norm = new TH1F*[nAMs];
@@ -1633,21 +1795,21 @@ int main()
 		c2->SaveAs(Form("%s/pixelPattern.gif",outputPathAM[im].Data()));
 					
 		comptonSpec2ClustersCorr[im]->Draw("colz");
+		line1->DrawLine(comptonSpec2ClustersCorr[im]->GetXaxis()->GetXmin(),Na22Energy-pixelPattern[im]->GetXaxis()->GetXmin(),Na22Energy-pixelPattern[im]->GetYaxis()->GetXmin(),comptonSpec2ClustersCorr[im]->GetYaxis()->GetXmin());
+		line1->DrawLine(comptonSpec2ClustersCorr[im]->GetXaxis()->GetXmin(),Na22Energy-XRF_Cd-pixelPattern[im]->GetXaxis()->GetXmin(),Na22Energy-XRF_Cd-pixelPattern[im]->GetYaxis()->GetXmin(),comptonSpec2ClustersCorr[im]->GetYaxis()->GetXmin());
+		line1->DrawLine(comptonSpec2ClustersCorr[im]->GetXaxis()->GetXmin(),Na22Energy-XRF_Te-pixelPattern[im]->GetXaxis()->GetXmin(),Na22Energy-XRF_Te-pixelPattern[im]->GetYaxis()->GetXmin(),comptonSpec2ClustersCorr[im]->GetYaxis()->GetXmin());
 		c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(comptonSpec2ClustersCorr[im]->GetName()).Data()));
 		c2->GetPad(0)->SetLogz(1);
 		c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(comptonSpec2ClustersCorr[im]->GetName()).Data()));
 		c2->GetPad(0)->SetLogz(0);
-	
-		comptonHitsSpecClustersSizeCorr[im]->Draw("colz");
-		c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(comptonHitsSpecClustersSizeCorr[im]->GetName()).Data()));
+					
+		clusterSpec2ClusterEventsCorr[im]->Draw("colz");
+		line1->DrawLine(clusterSpec2ClusterEventsCorr[im]->GetXaxis()->GetXmin(),Na22Energy-pixelPattern[im]->GetXaxis()->GetXmin(),Na22Energy-pixelPattern[im]->GetYaxis()->GetXmin(),clusterSpec2ClusterEventsCorr[im]->GetYaxis()->GetXmin());
+		line1->DrawLine(clusterSpec2ClusterEventsCorr[im]->GetXaxis()->GetXmin(),Na22Energy-XRF_Cd-pixelPattern[im]->GetXaxis()->GetXmin(),Na22Energy-XRF_Cd-pixelPattern[im]->GetYaxis()->GetXmin(),clusterSpec2ClusterEventsCorr[im]->GetYaxis()->GetXmin());
+		line1->DrawLine(clusterSpec2ClusterEventsCorr[im]->GetXaxis()->GetXmin(),Na22Energy-XRF_Te-pixelPattern[im]->GetXaxis()->GetXmin(),Na22Energy-XRF_Te-pixelPattern[im]->GetYaxis()->GetXmin(),clusterSpec2ClusterEventsCorr[im]->GetYaxis()->GetXmin());
+		c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(clusterSpec2ClusterEventsCorr[im]->GetName()).Data()));
 		c2->GetPad(0)->SetLogz(1);
-		c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(comptonHitsSpecClustersSizeCorr[im]->GetName()).Data()));
-		c2->GetPad(0)->SetLogz(0);
-		
-		comptonHitsClusters_nTrigsCorr[im]->Draw("colz");
-		c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(comptonHitsClusters_nTrigsCorr[im]->GetName()).Data()));
-		c2->GetPad(0)->SetLogz(1);
-		c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(comptonHitsClusters_nTrigsCorr[im]->GetName()).Data()));
+		c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(clusterSpec2ClusterEventsCorr[im]->GetName()).Data()));
 		c2->GetPad(0)->SetLogz(0);
 	
 		dPhiPlaneAM[im]->Draw("colz");
@@ -1656,10 +1818,10 @@ int main()
 		c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(dPhiPlaneAM[im]->GetName()).Data()));
 		c2->GetPad(0)->SetLogz(0);
 	
-		clusterSizeMaxE_SecE[im]->Draw("colz");
-		c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(clusterSizeMaxE_SecE[im]->GetName()).Data()));
+		clusterSize2ClusterEventsCorr[im]->Draw("colz");
+		c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(clusterSize2ClusterEventsCorr[im]->GetName()).Data()));
 		c2->GetPad(0)->SetLogz(1);
-		c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(clusterSizeMaxE_SecE[im]->GetName()).Data()));
+		c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(clusterSize2ClusterEventsCorr[im]->GetName()).Data()));
 		c2->GetPad(0)->SetLogz(0);
 					
 		firstComptonCluster[im]->Draw("colz");
@@ -1757,55 +1919,66 @@ int main()
 		c2->GetPad(0)->SetLogz(0);
 		c2->SaveAs(Form("%s/%s_pix.png",outputPathAM[im].Data(),TString(allClustersCOGFreqImage[im]->GetName()).Data()));
 		
+		theta_firstCluster_XYtE_Corr[im]->Draw("colz");
+		line1->DrawLine(0,0,180,180);
+		c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(theta_firstCluster_XYtE_Corr[im]->GetName()).Data()));
+		c2->GetPad(0)->SetLogz(1);
+		c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(theta_firstCluster_XYtE_Corr[im]->GetName()).Data()));
+		c2->GetPad(0)->SetLogz(0);
+
+		theta_firstCluster_XYtE_Corr_w[im]->Draw("colz");
+		line1->DrawLine(0,0,180,180);
+		c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(theta_firstCluster_XYtE_Corr_w[im]->GetName()).Data()));
+		c2->GetPad(0)->SetLogz(1);
+		c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(theta_firstCluster_XYtE_Corr_w[im]->GetName()).Data()));
+		c2->GetPad(0)->SetLogz(0);
+		
 		c1->cd(0);
-		singleClusterEventsSpec[im]->Draw();
-		Y_text_top = 0.82;
-		getHistoPeak(singleClusterEventsSpec[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
-		Peak_FWHM_raw = getFWHM(singleClusterEventsSpec[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
-		txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
-		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
-		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
-		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/singleClusterEventsSpec[im]->GetBinWidth(1)));
-		line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
-		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(singleClusterEventsSpec[im]->GetName()).Data()));
-		
-		summedClusterEventsSpec[im]->Draw();
-		Y_text_top = 0.82;
-		getHistoPeak(summedClusterEventsSpec[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
-		Peak_FWHM_raw = getFWHM(summedClusterEventsSpec[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
-		txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
-		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
-		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
-		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/summedClusterEventsSpec[im]->GetBinWidth(1)));
-		line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
-		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(summedClusterEventsSpec[im]->GetName()).Data()));
-		
 		allClustersSpec[im]->Draw();
-		Y_text_top = 0.82;
-		getHistoPeak(allClustersSpec[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
-		Peak_FWHM_raw = getFWHM(allClustersSpec[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
-		txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
-		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
-		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
-		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/allClustersSpec[im]->GetBinWidth(1)));
-		line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(allClustersSpec[im]->GetName()).Data()));
 
-		clusterE_nTrigs[im]->Draw("colz");
-		c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(clusterE_nTrigs[im]->GetName()).Data()));
-		c1->GetPad(0)->SetLogz(1);
-		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(clusterE_nTrigs[im]->GetName()).Data()));
-		c1->GetPad(0)->SetLogz(0);
+		pixelSpecNeighbour1PixClusters[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(pixelSpecNeighbour1PixClusters[im]->GetName()).Data()));
+
+		clusterSpec_1ClusterEvents_summed[im]->Draw();
+		Y_text_top = 0.82;
+		getHistoPeak(clusterSpec_1ClusterEvents_summed[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+		Peak_FWHM_raw = getFWHM(clusterSpec_1ClusterEvents_summed[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+		txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/clusterSpec_1ClusterEvents_summed[im]->GetBinWidth(1)));
+		line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(clusterSpec_1ClusterEvents_summed[im]->GetName()).Data()));
+	
+		firstComptonClusterE[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(firstComptonClusterE[im]->GetName()).Data()));
 		
+		secondComptonClusterE[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(secondComptonClusterE[im]->GetName()).Data()));
+
+		firstComptonClusterE[im]->Draw();
+		secondComptonClusterE[im]->SetLineColor(2);
+		secondComptonClusterE[im]->Draw("same");
+		c1->SaveAs(Form("%s/%s_overlay.gif",outputPathAM[im].Data(),TString(firstComptonClusterE[im]->GetName()).Data()));
+		
+		clusterSpec_1ClusterEvents[im]->Draw();
+		Y_text_top = 0.82;
+		getHistoPeak(clusterSpec_1ClusterEvents[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+		Peak_FWHM_raw = getFWHM(clusterSpec_1ClusterEvents[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+		txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/clusterSpec_1ClusterEvents[im]->GetBinWidth(1)));
+		line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(clusterSpec_1ClusterEvents[im]->GetName()).Data()));
+	
 		cathodeSpecAllEvents[im]->Draw();
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(cathodeSpecAllEvents[im]->GetName()).Data()));
 		
@@ -1814,9 +1987,9 @@ int main()
 		
 		cathodeSpecSelPairs[im]->Draw();
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(cathodeSpecSelPairs[im]->GetName()).Data()));
-		
-		comptonSpecClusters[im]->Draw();
-		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSpecClusters[im]->GetName()).Data()));
+				
+		comptonSpecClusters_Eunsummed[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSpecClusters_Eunsummed[im]->GetName()).Data()));
 		
 		nClustersInEvent[im]->Draw();
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(nClustersInEvent[im]->GetName()).Data()));
@@ -1848,45 +2021,81 @@ int main()
 		nTrigsInEvent_norm[im]->Draw();
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(nTrigsInEvent_norm[im]->GetName()).Data()));
 		
-		nTrigs_clusterSize[im]->Draw("colz");
-		c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(nTrigs_clusterSize[im]->GetName()).Data()));
+		clusterSize_nClusters[im]->Draw("colz");
+		c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(clusterSize_nClusters[im]->GetName()).Data()));
 		c1->GetPad(0)->SetLogz(1);
-		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(nTrigs_clusterSize[im]->GetName()).Data()));
+		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(clusterSize_nClusters[im]->GetName()).Data()));
 		c1->GetPad(0)->SetLogz(0);
 		
-		if (makeRawTimingStuff) 
-		{
-			c2->cd(0);
-			rawTimingTwoPixelClustersCorr[im]->Draw("colz");
-			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(rawTimingTwoPixelClustersCorr[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(1);
-			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(rawTimingTwoPixelClustersCorr[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(0);
-			
-			c1->cd(0);
-			rawTimingDiff2PixClusters[im]->Draw();
-			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(rawTimingDiff2PixClusters[im]->GetName()).Data()));
-
-			rawTimingDiff3PixClusters[im]->Draw();
-			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(rawTimingDiff3PixClusters[im]->GetName()).Data()));
-			
-			rawTimingDiffAllClusters[im]->Draw();
-			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(rawTimingDiffAllClusters[im]->GetName()).Data()));
-			
-			if (!doNotUseCornerPixelsInPixelClusterCOGEneg) 
-			{
-				rawTimingDiff2PixDiagClusters[im]->Draw();
-				c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(rawTimingDiff2PixDiagClusters[im]->GetName()).Data()));
-			}
-		}
 		if (makeTimingCalibrationStuff)
 		{			
-			c2->cd(0);
-			anodeTimingTwoPixelClustersCorr[im]->Draw("colz");
-			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(anodeTimingTwoPixelClustersCorr[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(1);
-			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(anodeTimingTwoPixelClustersCorr[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(0);
+			c2->cd(0);			
+			if (enableUpdateEnergyClusters)
+			{
+				anodeTiming1PixelClustersNeigbCorr[im]->Draw("colz");
+				if (enableUpdateEnergyClusters)
+				{
+					line2->DrawLine(anodeTiming1PixelClustersNeigbCorr[im]->GetXaxis()->GetXmin(),
+						anodeTiming1PixelClustersNeigbCorr[im]->GetXaxis()->GetXmin()+maxDtBetweenSinglePixClusters4updatingEnergy_up,
+							anodeTiming1PixelClustersNeigbCorr[im]->GetXaxis()->GetXmax()-maxDtBetweenSinglePixClusters4updatingEnergy_up,
+								anodeTiming1PixelClustersNeigbCorr[im]->GetYaxis()->GetXmax());
+					line2->DrawLine(anodeTiming1PixelClustersNeigbCorr[im]->GetXaxis()->GetXmin()+maxDtBetweenSinglePixClusters4updatingEnergy_low,
+						anodeTiming1PixelClustersNeigbCorr[im]->GetYaxis()->GetXmin(),
+							anodeTiming1PixelClustersNeigbCorr[im]->GetXaxis()->GetXmax(),
+								anodeTiming1PixelClustersNeigbCorr[im]->GetXaxis()->GetXmax()-maxDtBetweenSinglePixClusters4updatingEnergy_low);
+				}
+				c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(anodeTiming1PixelClustersNeigbCorr[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(1);
+				c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(anodeTiming1PixelClustersNeigbCorr[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(0);
+
+				anodeTiming2PixelClustersNeigbCorr[im]->Draw("colz");
+				if (enableUpdateEnergyClusters)
+				{
+					line2->DrawLine(anodeTiming2PixelClustersNeigbCorr[im]->GetXaxis()->GetXmin(),
+						anodeTiming2PixelClustersNeigbCorr[im]->GetXaxis()->GetXmin()+maxDtBetweenTwoPixClusters4updatingEnergy_up,
+							anodeTiming2PixelClustersNeigbCorr[im]->GetXaxis()->GetXmax()-maxDtBetweenTwoPixClusters4updatingEnergy_up,
+								anodeTiming2PixelClustersNeigbCorr[im]->GetYaxis()->GetXmax());
+					line2->DrawLine(anodeTiming2PixelClustersNeigbCorr[im]->GetXaxis()->GetXmin()+maxDtBetweenTwoPixClusters4updatingEnergy_low,
+						anodeTiming2PixelClustersNeigbCorr[im]->GetYaxis()->GetXmin(),
+							anodeTiming2PixelClustersNeigbCorr[im]->GetXaxis()->GetXmax(),
+								anodeTiming2PixelClustersNeigbCorr[im]->GetXaxis()->GetXmax()-maxDtBetweenTwoPixClusters4updatingEnergy_low);
+				}
+				c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(anodeTiming2PixelClustersNeigbCorr[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(1);
+				c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(anodeTiming2PixelClustersNeigbCorr[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(0);
+				
+				dAnodeTiming_vs_nE_1PixelClustersNeigb[im]->Draw("colz");
+				c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(dAnodeTiming_vs_nE_1PixelClustersNeigb[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(1);
+				c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(dAnodeTiming_vs_nE_1PixelClustersNeigb[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(0);
+				
+				dAnodeTiming_vs_sumE_1PixelClustersNeigb[im]->Draw("colz");
+				c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(dAnodeTiming_vs_sumE_1PixelClustersNeigb[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(1);
+				c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(dAnodeTiming_vs_sumE_1PixelClustersNeigb[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(0);
+				
+				dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[im]->Draw("colz");
+				c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(1);
+				c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(0);
+				
+				anodeTimingNeigb_nE_1PixelClusters[im]->Draw("colz");
+				c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(anodeTimingNeigb_nE_1PixelClusters[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(1);
+				c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(anodeTimingNeigb_nE_1PixelClusters[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(0);
+				
+				anodeTimingNeigb_nE_2PixelClusters[im]->Draw("colz");
+				c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(anodeTimingNeigb_nE_2PixelClusters[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(1);
+				c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(anodeTimingNeigb_nE_2PixelClusters[im]->GetName()).Data()));
+				c2->GetPad(0)->SetLogz(0);
+			}
 			
 			if (!doNotUseCornerPixelsInPixelClusterCOGEneg) 
 			{
@@ -1896,26 +2105,27 @@ int main()
 				c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(anodeTiming2PixDiagClustersCorr[im]->GetName()).Data()));
 				c2->GetPad(0)->SetLogz(0);
 				
+				c1->cd(0);
 				anodeTimingDiff2PixDiagClusters[im]->Draw();
 				c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(anodeTimingDiff2PixDiagClusters[im]->GetName()).Data()));
 			}
 			
+			c2->cd(0);
 			anodeTiming2PixClustersCorr[im]->Draw("colz");
+			if (applyMaxDtCut4Clustering)
+			{
+				line2->DrawLine(anodeTiming2PixClustersCorr[im]->GetXaxis()->GetXmin(),
+					anodeTiming2PixClustersCorr[im]->GetYaxis()->GetXmin()+maxDtBetweenPixel4Clustering,
+						anodeTiming2PixClustersCorr[im]->GetXaxis()->GetXmax()-maxDtBetweenPixel4Clustering,
+							anodeTiming2PixClustersCorr[im]->GetYaxis()->GetXmax());
+				line2->DrawLine(anodeTiming2PixClustersCorr[im]->GetXaxis()->GetXmin()+maxDtBetweenPixel4Clustering,
+					anodeTiming2PixClustersCorr[im]->GetYaxis()->GetXmin(),
+						anodeTiming2PixClustersCorr[im]->GetXaxis()->GetXmax(),
+							anodeTiming2PixClustersCorr[im]->GetXaxis()->GetXmax()-maxDtBetweenPixel4Clustering);
+			}
 			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(anodeTiming2PixClustersCorr[im]->GetName()).Data()));
 			c2->GetPad(0)->SetLogz(1);
 			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(anodeTiming2PixClustersCorr[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(0);
-			
-			anodeTiming3PixClustersCorr[im]->Draw("colz");
-			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(anodeTiming3PixClustersCorr[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(1);
-			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(anodeTiming3PixClustersCorr[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(0);
-			
-			anodeTimingTwoClustersAMCorr[im]->Draw("colz");
-			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(anodeTimingTwoClustersAMCorr[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(1);
-			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(anodeTimingTwoClustersAMCorr[im]->GetName()).Data()));
 			c2->GetPad(0)->SetLogz(0);
 			
 			dAnodeTiming_vs_theta[im]->Draw("colz");
@@ -1942,30 +2152,6 @@ int main()
 			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(dAnodeTimingAbs_vs_E12[im]->GetName()).Data()));
 			c2->GetPad(0)->SetLogz(0);
 			
-			dist12_vs_E1[im]->Draw("colz");
-			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(dist12_vs_E1[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(1);
-			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(dist12_vs_E1[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(0);
-			
-			dist12_vs_E2[im]->Draw("colz");
-			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(dist12_vs_E2[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(1);
-			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(dist12_vs_E2[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(0);
-			
-			dist12_vs_E12[im]->Draw("colz");
-			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(dist12_vs_E12[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(1);
-			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(dist12_vs_E12[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(0);
-			
-			dist12_over_E12sq[im]->Draw("colz");
-			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(dist12_over_E12sq[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(1);
-			c2->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(dist12_over_E12sq[im]->GetName()).Data()));
-			c2->GetPad(0)->SetLogz(0);
-			
 			dAnodeTiming_vs_E1[im]->Draw("colz");
 			c2->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(dAnodeTiming_vs_E1[im]->GetName()).Data()));
 			c2->GetPad(0)->SetLogz(1);
@@ -1975,14 +2161,29 @@ int main()
 			c1->cd(0);
 			anodeTimingDiff2PixClusters[im]->Draw();
 			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(anodeTimingDiff2PixClusters[im]->GetName()).Data()));
-
-			anodeTimingDiff3PixClusters[im]->Draw();
-			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(anodeTimingDiff3PixClusters[im]->GetName()).Data()));
 			
 			anodeTimingDiffAllClusters[im]->Draw();
-			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(anodeTimingDiffAllClusters[im]->GetName()).Data()));
+			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(anodeTimingDiffAllClusters[im]->GetName()).Data()));			
+					
+			clusterZfromAnodeTiming[im]->Draw();
+			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(clusterZfromAnodeTiming[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogy(1);
+			c1->SaveAs(Form("%s/%s_logy.gif",outputPathAM[im].Data(),TString(clusterZfromAnodeTiming[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogy(0);
 		}
 		
+		comptonEventsDeltaZdist[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonEventsDeltaZdist[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogy(1);
+		c1->SaveAs(Form("%s/%s_logy.gif",outputPathAM[im].Data(),TString(comptonEventsDeltaZdist[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogy(0);
+
+		comptonEventsDeltaZpix[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonEventsDeltaZpix[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogy(1);
+		c1->SaveAs(Form("%s/%s_logy.gif",outputPathAM[im].Data(),TString(comptonEventsDeltaZpix[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogy(0);
+
 		clusterE_vsSize[im]->Draw("colz");
 		c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(clusterE_vsSize[im]->GetName()).Data()));
 		c1->GetPad(0)->SetLogz(1);
@@ -1994,48 +2195,168 @@ int main()
 		c1->GetPad(0)->SetLogz(1);
 		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(clusterMaxE_vsSize[im]->GetName()).Data()));
 		c1->GetPad(0)->SetLogz(0);
-	
-		clusterSecE_vsSize[im]->Draw("colz");
-		c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(clusterSecE_vsSize[im]->GetName()).Data()));
-		c1->GetPad(0)->SetLogz(1);
-		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(clusterSecE_vsSize[im]->GetName()).Data()));
-		c1->GetPad(0)->SetLogz(0);
-	
-		nTrigsInEvent_maxEcluster[im]->Draw("colz");
-		c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(nTrigsInEvent_maxEcluster[im]->GetName()).Data()));
-		c1->GetPad(0)->SetLogz(1);
-		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(nTrigsInEvent_maxEcluster[im]->GetName()).Data()));
-		c1->GetPad(0)->SetLogz(0);
+		
+		if (enableUpdateEnergyClusters)
+		{
+			clusterSummingStats1PixClusters[im]->SetNormFactor(1);
+			clusterSummingStats1PixClusters[im]->Draw();
+			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(clusterSummingStats1PixClusters[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogy(1);
+			c1->SaveAs(Form("%s/%s_logy.png",outputPathAM[im].Data(),TString(clusterSummingStats1PixClusters[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogy(0);		
+
+			clusterSummingStats2PixClusters[im]->SetNormFactor(1);
+			clusterSummingStats2PixClusters[im]->Draw();
+			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(clusterSummingStats2PixClusters[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogy(1);
+			c1->SaveAs(Form("%s/%s_logy.png",outputPathAM[im].Data(),TString(clusterSummingStats2PixClusters[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogy(0);		
+
+			comptonSpecClusters[im]->Draw();
+			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSpecClusters[im]->GetName()).Data()));
+
+			comptonSummedSpec2Clusters[im]->Draw();
+			line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters[im]->GetMaximum()/3);
+			Y_text_top = 0.82;
+			getHistoPeak(comptonSummedSpec2Clusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+			Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+			txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters[im]->GetBinWidth(1)));
+			line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters[im]->GetName()).Data()));
+		
+			comptonSummedSpec2Clusters_1PixClusters[im]->Draw();
+			line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1PixClusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1PixClusters[im]->GetMaximum()/3);
+			Y_text_top = 0.82;
+			getHistoPeak(comptonSummedSpec2Clusters_1PixClusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+			Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_1PixClusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+			txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters_1PixClusters[im]->GetBinWidth(1)));
+			line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_1PixClusters[im]->GetName()).Data()));
+		
+			comptonSummedSpec2Clusters_2PixClusters[im]->Draw();
+			line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_2PixClusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_2PixClusters[im]->GetMaximum()/3);
+			Y_text_top = 0.82;
+			getHistoPeak(comptonSummedSpec2Clusters_2PixClusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+			Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_2PixClusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+			txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters_2PixClusters[im]->GetBinWidth(1)));
+			line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_2PixClusters[im]->GetName()).Data()));
+		
+			comptonSummedSpec2Clusters_1_2PixClusters[im]->Draw();
+			line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMaximum()/3);
+			Y_text_top = 0.82;
+			getHistoPeak(comptonSummedSpec2Clusters_1_2PixClusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+			Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_1_2PixClusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+			txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+			Y_text_top -= Y_text_step;
+			txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters_1_2PixClusters[im]->GetBinWidth(1)));
+			line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_1_2PixClusters[im]->GetName()).Data()));
+			
+			energySpecCorr1PixClusters[im]->Draw("colz");
+			c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(energySpecCorr1PixClusters[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogz(1);
+			c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(energySpecCorr1PixClusters[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogz(0);		
+			
+			energySpecCorr2PixClusters[im]->Draw("colz");
+			c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(energySpecCorr2PixClusters[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogz(1);
+			c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(energySpecCorr2PixClusters[im]->GetName()).Data()));
+			c1->GetPad(0)->SetLogz(0);		
+		}
 		
 		c1->cd(0);
-		comptonSummedSpec2Clusters[im]->Draw();
+		comptonSummedSpec2Clusters_Eunsummed[im]->Draw();
+		line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_Eunsummed[im]->GetMaximum()/3);
 		Y_text_top = 0.82;
-		getHistoPeak(comptonSummedSpec2Clusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
-		Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+		getHistoPeak(comptonSummedSpec2Clusters_Eunsummed[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+		Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_Eunsummed[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
 		txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
 		Y_text_top -= Y_text_step;
 		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
 		Y_text_top -= Y_text_step;
 		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
 		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters[im]->GetBinWidth(1)));
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters_Eunsummed[im]->GetBinWidth(1)));
 		line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
-		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters[im]->GetName()).Data()));
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_Eunsummed[im]->GetName()).Data()));
 		
-		comptonSummedSpecEventClusters[im]->Draw();
+		comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->Draw();
+		line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMaximum()/3);
 		Y_text_top = 0.82;
-		getHistoPeak(comptonSummedSpecEventClusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
-		Peak_FWHM_raw = getFWHM(comptonSummedSpecEventClusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+		getHistoPeak(comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+		Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
 		txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
 		Y_text_top -= Y_text_step;
 		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
 		Y_text_top -= Y_text_step;
 		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
 		Y_text_top -= Y_text_step;
-		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpecEventClusters[im]->GetBinWidth(1)));
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetBinWidth(1)));
 		line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
-		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpecEventClusters[im]->GetName()).Data()));
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetName()).Data()));
 		
+		comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->Draw();
+		line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMaximum()/3);
+		Y_text_top = 0.82;
+		getHistoPeak(comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+		Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+		txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetBinWidth(1)));
+		line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetName()).Data()));
+		
+		comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->Draw();
+		line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMaximum()/3);
+		Y_text_top = 0.82;
+		getHistoPeak(comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
+		Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+		txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+		Y_text_top -= Y_text_step;
+		txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetBinWidth(1)));
+		line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetName()).Data()));
+			
 		phiAngle[im]->Draw();
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(phiAngle[im]->GetName()).Data()));
 		
@@ -2048,10 +2369,34 @@ int main()
 		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(thetaFromFirstClusterE_dPhi[im]->GetName()).Data()));
 		c1->GetPad(0)->SetLogz(0);
 		
+		thetaFromFirstClusterE_dPhi_w[im]->Draw("colz");
+		c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(thetaFromFirstClusterE_dPhi_w[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogz(1);
+		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(thetaFromFirstClusterE_dPhi_w[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogz(0);
+		
+		thetaFromXYtClusterE_dPhi[im]->Draw("colz");
+		c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(thetaFromXYtClusterE_dPhi[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogz(1);
+		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(thetaFromXYtClusterE_dPhi[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogz(0);
+		
+		thetaFromXYtClusterE_dPhi_w[im]->Draw("colz");
+		c1->SaveAs(Form("%s/%s.png",outputPathAM[im].Data(),TString(thetaFromXYtClusterE_dPhi_w[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogz(1);
+		c1->SaveAs(Form("%s/%s_logz.png",outputPathAM[im].Data(),TString(thetaFromXYtClusterE_dPhi_w[im]->GetName()).Data()));
+		c1->GetPad(0)->SetLogz(0);
+			
+		thetaFromXYtE[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(thetaFromXYtE[im]->GetName()).Data()));
+		
+		thetaFromXYtE_w[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(thetaFromXYtE_w[im]->GetName()).Data()));
+		
 		thetaFromFirstClusterE[im]->Draw();
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(thetaFromFirstClusterE[im]->GetName()).Data()));
 		
-		thetaFromFirstClusterE_w[im]->Draw();
+		thetaFromFirstClusterE_w[im]->Draw("hist");
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(thetaFromFirstClusterE_w[im]->GetName()).Data()));
 		
 		thetaFromFirstClusterE_1pixOnly[im]->Draw();
@@ -2075,6 +2420,16 @@ int main()
 		clusterSize_norm[im]->GetYaxis()->SetTitleOffset(1.3);
 		clusterSize_norm[im]->Draw();
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(clusterSize_norm[im]->GetName()).Data()));
+		
+		numberOfClusters[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(numberOfClusters[im]->GetName()).Data()));
+		numberOfClusters_norm[im] = (TH1F *) numberOfClusters[im]->Clone();
+		numberOfClusters_norm[im]->SetName(Form("numberOfClusters_norm_AM%d",im));
+		numberOfClusters_norm[im]->SetNormFactor(1);
+		numberOfClusters_norm[im]->GetYaxis()->SetTitle("Normalised counts");
+		numberOfClusters_norm[im]->GetYaxis()->SetTitleOffset(1.3);
+		numberOfClusters_norm[im]->Draw();
+		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(numberOfClusters_norm[im]->GetName()).Data()));
 		
 		firstComptonClusterSize[im]->Draw();
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(firstComptonClusterSize[im]->GetName()).Data()));
@@ -2154,6 +2509,16 @@ int main()
 	}
 	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngle->GetName()).Data()));
 	
+	dPhiAngle_w->SetMinimum(0);
+	dPhiAngle_w->Draw("hist");
+	if (makeCosineFit)
+	{
+		TF1 *ffunc = new TF1("fit",fitfun,dPhiAngle_w->GetXaxis()->GetXmin(),dPhiAngle_w->GetXaxis()->GetXmax(),2);
+		dPhiAngle_w->Fit(ffunc,"RQ0");
+		ffunc->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngle_w->GetName()).Data()));
+	
 	dPhiAngleNorm->SetMinimum(0);
 	Int_t b1 = dPhiAngleNorm->GetXaxis()->FindBin(-0.01);
 	Int_t b2 = dPhiAngleNorm->GetXaxis()->FindBin(0.01);
@@ -2171,6 +2536,40 @@ int main()
 		ffunc->Draw("same");
 	}
 	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngleNorm->GetName()).Data()));
+	
+	dPhiAngleNorm_w->SetMinimum(0);
+	b1 = dPhiAngleNorm_w->GetXaxis()->FindBin(-0.01);
+	b2 = dPhiAngleNorm_w->GetXaxis()->FindBin(0.01);
+	nf = (dPhiAngleNorm_w->GetBinContent(b1) + dPhiAngleNorm_w->GetBinContent(b2))/2;
+	for (Int_t ib = 1; ib <= dPhiAngleNorm_w->GetNbinsX(); ib++)
+	{
+		Float_t bc = dPhiAngleNorm_w->GetBinContent(ib)/nf;
+		dPhiAngleNorm_w->SetBinContent(ib,bc);
+	}
+	dPhiAngleNorm_w->Draw("hist");
+	if (makeCosineFit)
+	{
+		TF1 *ffunc = new TF1("fit",fitfun,dPhiAngleNorm_w->GetXaxis()->GetXmin(),dPhiAngleNorm_w->GetXaxis()->GetXmax(),2);
+		dPhiAngleNorm_w->Fit(ffunc,"RQ0");
+		ffunc->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngleNorm_w->GetName()).Data()));
+	
+	dPhiAngle1norm->SetMinimum(0);
+	Float_t nf1 = (dPhiAngle1norm->GetBinContent(1) + dPhiAngle1norm->GetBinContent(dPhiAngle1norm->GetNbinsX()))/2;
+	for (Int_t ib = 1; ib <= dPhiAngle1norm->GetNbinsX(); ib++)
+	{
+		Float_t bc = dPhiAngle1norm->GetBinContent(ib)/nf1;
+		dPhiAngle1norm->SetBinContent(ib,bc);
+	}
+	dPhiAngle1norm->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc1 = new TF1("fit",fitfun,dPhiAngle1norm->GetXaxis()->GetXmin(),dPhiAngle1norm->GetXaxis()->GetXmax(),2);
+		dPhiAngle1norm->Fit(ffunc1,"RQ0");
+		ffunc1->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngle1norm->GetName()).Data()));
 
 	dPhiAngle_Ewin->SetMinimum(0);
 	dPhiAngle_Ewin->Draw();
@@ -2181,6 +2580,16 @@ int main()
 		ffunc_Ewin->Draw("same");
 	}
 	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngle_Ewin->GetName()).Data()));
+
+	dPhiAngle_Ewin_w->SetMinimum(0);
+	dPhiAngle_Ewin_w->Draw("hist");
+	if (makeCosineFit)
+	{
+		TF1 *ffunc_Ewin = new TF1("fit_Ewin",fitfun,dPhiAngle_Ewin_w->GetXaxis()->GetXmin(),dPhiAngle_Ewin_w->GetXaxis()->GetXmax(),2);
+		dPhiAngle_Ewin_w->Fit(ffunc_Ewin,"RQ0");
+		ffunc_Ewin->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngle_Ewin_w->GetName()).Data()));
 
 	dPhiAngleNorm_Ewin->SetMinimum(0);
 	Int_t b1w = dPhiAngleNorm_Ewin->GetXaxis()->FindBin(-0.01);
@@ -2199,6 +2608,24 @@ int main()
 		ffunc_Ewin->Draw("same");
 	}
 	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngleNorm_Ewin->GetName()).Data()));
+
+	dPhiAngleNorm_Ewin_w->SetMinimum(0);
+	b1w = dPhiAngleNorm_Ewin_w->GetXaxis()->FindBin(-0.01);
+	b2w = dPhiAngleNorm_Ewin_w->GetXaxis()->FindBin(0.01);
+	nf_w = (dPhiAngleNorm_Ewin_w->GetBinContent(b1w) + dPhiAngleNorm_Ewin_w->GetBinContent(b2w))/2;
+	for (Int_t ib = 1; ib <= dPhiAngleNorm_Ewin_w->GetNbinsX(); ib++)
+	{
+		Float_t bc = dPhiAngleNorm_Ewin_w->GetBinContent(ib)/nf_w;
+		dPhiAngleNorm_Ewin_w->SetBinContent(ib,bc);
+	}
+	dPhiAngleNorm_Ewin_w->Draw("hist");
+	if (makeCosineFit)
+	{
+		TF1 *ffunc_Ewin = new TF1("fit_Ewin",fitfun,dPhiAngleNorm_Ewin_w->GetXaxis()->GetXmin(),dPhiAngleNorm_Ewin_w->GetXaxis()->GetXmax(),2);
+		dPhiAngleNorm_Ewin_w->Fit(ffunc_Ewin,"RQ0");
+		ffunc_Ewin->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngleNorm_Ewin_w->GetName()).Data()));
 	
 	dPhiAngle1->SetMinimum(0);
 	dPhiAngle1->Draw();
@@ -2219,30 +2646,174 @@ int main()
 		ffunc_Ewin->Draw("same");
 	}
 	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngle1_Ewin->GetName()).Data()));	
+
+	dPhiAngle1norm_Ewin->SetMinimum(0);
+	Float_t nf1_w = (dPhiAngle1norm_Ewin->GetBinContent(1) + dPhiAngle1norm_Ewin->GetBinContent(dPhiAngle1norm_Ewin->GetNbinsX()))/2;
+	for (Int_t ib = 1; ib <= dPhiAngle1norm_Ewin->GetNbinsX(); ib++)
+	{
+		Float_t bc = dPhiAngle1norm_Ewin->GetBinContent(ib)/nf1_w;
+		dPhiAngle1norm_Ewin->SetBinContent(ib,bc);
+	}
+	dPhiAngle1norm_Ewin->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc2_Ewin = new TF1("fit_Ewin",fitfun,dPhiAngle1norm_Ewin->GetXaxis()->GetXmin(),dPhiAngle1norm_Ewin->GetXaxis()->GetXmax(),2);
+		dPhiAngle1norm_Ewin->Fit(ffunc2_Ewin,"RQ0");
+		ffunc2_Ewin->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngle1norm_Ewin->GetName()).Data()));
 	
+	dPhiXYtAngle->SetMinimum(0);
+	dPhiXYtAngle->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc = new TF1("fit",fitfun,dPhiXYtAngle->GetXaxis()->GetXmin(),dPhiXYtAngle->GetXaxis()->GetXmax(),2);
+		dPhiXYtAngle->Fit(ffunc,"RQ0");
+		ffunc->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiXYtAngle->GetName()).Data()));	
+	
+	dPhiXYtAngle_Ewin->SetMinimum(0);
+	dPhiXYtAngle_Ewin->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc_Ewin = new TF1("fit_Ewin",fitfun,dPhiXYtAngle_Ewin->GetXaxis()->GetXmin(),dPhiXYtAngle_Ewin->GetXaxis()->GetXmax(),2);
+		dPhiXYtAngle_Ewin->Fit(ffunc_Ewin,"RQ0");
+		ffunc_Ewin->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiXYtAngle_Ewin->GetName()).Data()));
+	
+	dPhiXYtAngleNorm->SetMinimum(0);
+	Int_t b1x = dPhiXYtAngleNorm->GetXaxis()->FindBin(-0.01);
+	Int_t b2x = dPhiXYtAngleNorm->GetXaxis()->FindBin(0.01);
+	Float_t nfx = (dPhiXYtAngleNorm->GetBinContent(b1x) + dPhiXYtAngleNorm->GetBinContent(b2x))/2;
+	for (Int_t ib = 1; ib <= dPhiXYtAngleNorm->GetNbinsX(); ib++)
+	{
+		Float_t bc = dPhiXYtAngleNorm->GetBinContent(ib)/nfx;
+		dPhiXYtAngleNorm->SetBinContent(ib,bc);
+	}
+	dPhiXYtAngleNorm->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc = new TF1("fit",fitfun,dPhiXYtAngleNorm->GetXaxis()->GetXmin(),dPhiXYtAngleNorm->GetXaxis()->GetXmax(),2);
+		dPhiXYtAngleNorm->Fit(ffunc,"RQ0");
+		ffunc->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiXYtAngleNorm->GetName()).Data()));
+	
+	dPhiXYtAngleNorm_Ewin->SetMinimum(0);
+	Int_t b1wx = dPhiXYtAngleNorm_Ewin->GetXaxis()->FindBin(-0.01);
+	Int_t b2wx = dPhiXYtAngleNorm_Ewin->GetXaxis()->FindBin(0.01);
+	Float_t nf_wx = (dPhiXYtAngleNorm_Ewin->GetBinContent(b1wx) + dPhiXYtAngleNorm_Ewin->GetBinContent(b2wx))/2;
+	for (Int_t ib = 1; ib <= dPhiXYtAngleNorm_Ewin->GetNbinsX(); ib++)
+	{
+		Float_t bc = dPhiXYtAngleNorm_Ewin->GetBinContent(ib)/nf_wx;
+		dPhiXYtAngleNorm_Ewin->SetBinContent(ib,bc);
+	}
+	dPhiXYtAngleNorm_Ewin->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc_Ewin = new TF1("fit_Ewin",fitfun,dPhiXYtAngleNorm_Ewin->GetXaxis()->GetXmin(),dPhiXYtAngleNorm_Ewin->GetXaxis()->GetXmax(),2);
+		dPhiXYtAngleNorm_Ewin->Fit(ffunc_Ewin,"RQ0");
+		ffunc_Ewin->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiXYtAngleNorm_Ewin->GetName()).Data()));
+	
+	dPhiXYtAngle1->SetMinimum(0);
+	dPhiXYtAngle1->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc = new TF1("fit",fitfun,dPhiXYtAngle1->GetXaxis()->GetXmin(),dPhiXYtAngle1->GetXaxis()->GetXmax(),2);
+		dPhiXYtAngle1->Fit(ffunc,"RQ0");
+		ffunc->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiXYtAngle1->GetName()).Data()));
+	
+	dPhiXYtAngle1_Ewin->SetMinimum(0);
+	dPhiXYtAngle1_Ewin->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc = new TF1("fit",fitfun,dPhiXYtAngle1_Ewin->GetXaxis()->GetXmin(),dPhiXYtAngle1_Ewin->GetXaxis()->GetXmax(),2);
+		dPhiXYtAngle1_Ewin->Fit(ffunc,"RQ0");
+		ffunc->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiXYtAngle1_Ewin->GetName()).Data()));
+	
+	dPhiXYtAngle1Norm->SetMinimum(0);
+	Float_t nf1x = (dPhiXYtAngle1Norm->GetBinContent(1) + dPhiXYtAngle1Norm->GetBinContent(dPhiXYtAngle1Norm->GetNbinsX()))/2;
+	for (Int_t ib = 1; ib <= dPhiXYtAngle1Norm->GetNbinsX(); ib++)
+	{
+		Float_t bc = dPhiXYtAngle1Norm->GetBinContent(ib)/nf1x;
+		dPhiXYtAngle1Norm->SetBinContent(ib,bc);
+	}
+	dPhiXYtAngle1Norm->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc = new TF1("fit",fitfun,dPhiXYtAngle1Norm->GetXaxis()->GetXmin(),dPhiXYtAngle1Norm->GetXaxis()->GetXmax(),2);
+		dPhiXYtAngle1Norm->Fit(ffunc,"RQ0");
+		ffunc->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiXYtAngle1Norm->GetName()).Data()));
+	
+	dPhiXYtAngle1Norm_Ewin->SetMinimum(0);
+	nf1x = (dPhiXYtAngle1Norm_Ewin->GetBinContent(1) + dPhiXYtAngle1Norm_Ewin->GetBinContent(dPhiXYtAngle1Norm_Ewin->GetNbinsX()))/2;
+	for (Int_t ib = 1; ib <= dPhiXYtAngle1Norm_Ewin->GetNbinsX(); ib++)
+	{
+		Float_t bc = dPhiXYtAngle1Norm_Ewin->GetBinContent(ib)/nf1x;
+		dPhiXYtAngle1Norm_Ewin->SetBinContent(ib,bc);
+	}
+	dPhiXYtAngle1Norm_Ewin->Draw();
+	if (makeCosineFit)
+	{
+		TF1 *ffunc = new TF1("fit",fitfun,dPhiXYtAngle1Norm_Ewin->GetXaxis()->GetXmin(),dPhiXYtAngle1Norm_Ewin->GetXaxis()->GetXmax(),2);
+		dPhiXYtAngle1Norm_Ewin->Fit(ffunc,"RQ0");
+		ffunc->Draw("same");
+	}
+	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiXYtAngle1Norm_Ewin->GetName()).Data()));
+	
+	comptonSummedSpec2Clusters2Heads->Draw();
+	line1->DrawLine(Ewindow4PhiAnalyis_min*2,comptonSummedSpec2Clusters2Heads->GetMinimum(),Ewindow4PhiAnalyis_min*2,comptonSummedSpec2Clusters2Heads->GetMaximum()/3);
+	line1->DrawLine(Ewindow4PhiAnalyis_max*2,comptonSummedSpec2Clusters2Heads->GetMinimum(),Ewindow4PhiAnalyis_max*2,comptonSummedSpec2Clusters2Heads->GetMaximum()/3);
+	Y_text_top = 0.82;
+	getHistoPeak(comptonSummedSpec2Clusters2Heads, minPhotopeakE4PeakSearch*2, maxPhotopeakE4PeakSearch*2, locMaxPeak, locMaxPeakHeight);
+	Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters2Heads, locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch*2, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+	txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+	Y_text_top -= Y_text_step;
+	txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+	Y_text_top -= Y_text_step;
+	txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+	Y_text_top -= Y_text_step;
+	txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2Clusters2Heads->GetBinWidth(1)));
+	line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+	c1->SaveAs(Form("%s/%s.gif",outputPathPairs.Data(),TString(comptonSummedSpec2Clusters2Heads->GetName()).Data()));
+	
+	comptonSummedSpec2ClustersSelEvents2Heads->Draw();
+	line1->DrawLine(Ewindow4PhiAnalyis_min*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMinimum(),Ewindow4PhiAnalyis_min*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMaximum()/3);
+	line1->DrawLine(Ewindow4PhiAnalyis_max*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMinimum(),Ewindow4PhiAnalyis_max*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMaximum()/3);
+	Y_text_top = 0.82;
+	getHistoPeak(comptonSummedSpec2ClustersSelEvents2Heads, minPhotopeakE4PeakSearch*2, maxPhotopeakE4PeakSearch*2, locMaxPeak, locMaxPeakHeight);
+	Peak_FWHM_raw = getFWHM(comptonSummedSpec2ClustersSelEvents2Heads, locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch*2, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
+	txt->DrawLatex(X_text,Y_text_top,Form("peak = %.1f keV",locMaxPeak));
+	Y_text_top -= Y_text_step;
+	txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f keV",Peak_FWHM_raw));
+	Y_text_top -= Y_text_step;
+	txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.2f %%",Peak_FWHM_raw/locMaxPeak*100));
+	Y_text_top -= Y_text_step;
+	txt->DrawLatex(X_text,Y_text_top,Form("FWHM = %.1f bins",Peak_FWHM_raw/comptonSummedSpec2ClustersSelEvents2Heads->GetBinWidth(1)));
+	line2->DrawLine(Peak_FWHM_raw_leftEdge,locMaxPeakHeight/2,Peak_FWHM_raw_rightEdge,locMaxPeakHeight/2);
+	c1->SaveAs(Form("%s/%s.gif",outputPathPairs.Data(),TString(comptonSummedSpec2ClustersSelEvents2Heads->GetName()).Data()));
+
 	c2->cd(0);
-	singleClusterSpecCorr->Draw("colz");
-	c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(singleClusterSpecCorr->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(1);
-	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(singleClusterSpecCorr->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(0);
-	
 	comptonSummedSpec2ClustersCorr->Draw("colz");
 	c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(comptonSummedSpec2ClustersCorr->GetName()).Data()));
 	c2->GetPad(0)->SetLogz(1);
 	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(comptonSummedSpec2ClustersCorr->GetName()).Data()));
 	c2->GetPad(0)->SetLogz(0);
-	
-	comptonSummedSpecEventCorr->Draw("colz");
-	c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(comptonSummedSpecEventCorr->GetName()).Data()));
+
+	comptonSummedSpec2ClustersSelEventsCorr->Draw("colz");
+	c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(comptonSummedSpec2ClustersSelEventsCorr->GetName()).Data()));
 	c2->GetPad(0)->SetLogz(1);
-	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(comptonSummedSpecEventCorr->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(0);
-	
-	summedClusterSpecCorr->Draw("colz");
-	c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(summedClusterSpecCorr->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(1);
-	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(summedClusterSpecCorr->GetName()).Data()));
+	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(comptonSummedSpec2ClustersSelEventsCorr->GetName()).Data()));
 	c2->GetPad(0)->SetLogz(0);
 	
 	phiAngleCorr->Draw("colz");
@@ -2263,30 +2834,11 @@ int main()
 	c2->GetPad(0)->SetLogz(1);
 	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(dPhiAngle_2ClusterE->GetName()).Data()));
 	c2->GetPad(0)->SetLogz(0);
-	
-	dPhiAngle_totalE->Draw("colz");
-	dPhiAngle_totalE->GetXaxis()->SetRangeUser(300,dPhiAngle_totalE->GetXaxis()->GetXmax());
-	c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiAngle_totalE->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(1);
-	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(dPhiAngle_totalE->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(0);
 
 	theta0_theta1_FromFirstClusterE->Draw("colz");
 	c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(theta0_theta1_FromFirstClusterE->GetName()).Data()));
 	c2->GetPad(0)->SetLogz(1);
 	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(theta0_theta1_FromFirstClusterE->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(0);
-	
-	nClustersInEventCorr->Draw("colz");
-	c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(nClustersInEventCorr->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(1);
-	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(nClustersInEventCorr->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(0);
-	
-	nClustersInSelEventCorr->Draw("colz");
-	c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(nClustersInSelEventCorr->GetName()).Data()));
-	c2->GetPad(0)->SetLogz(1);
-	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(nClustersInSelEventCorr->GetName()).Data()));
 	c2->GetPad(0)->SetLogz(0);
 	
 	delete c0;
@@ -2306,17 +2858,27 @@ int main()
 		cathodeSpecPair[im]->Write();
 		cathodeSpecSelPairs[im]->Write();
 		allClustersSpec[im]->Write();
-		singleClusterEventsSpec[im]->Write();
-		summedClusterEventsSpec[im]->Write();
+		pixelSpecNeighbour1PixClusters[im]->Write();
 		nTrigsInEvent[im]->Write();
-		nTrigs_clusterSize[im]->Write();
-		nTrigsInEvent_maxEcluster[im]->Write();
-		comptonSummedSpec2Clusters[im]->Write();
-		comptonSummedSpecEventClusters[im]->Write();
-		comptonSpecClusters[im]->Write();
+		comptonSummedSpec2Clusters_Eunsummed[im]->Write();
+		comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->Write();
+		comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->Write();
+		comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->Write();
+		if (enableUpdateEnergyClusters)
+		{
+			comptonSpecClusters[im]->Write();
+			clusterSummingStats1PixClusters[im]->Write();
+			clusterSummingStats2PixClusters[im]->Write();
+			comptonSummedSpec2Clusters[im]->Write();
+			comptonSummedSpec2Clusters_1PixClusters[im]->Write();
+			comptonSummedSpec2Clusters_2PixClusters[im]->Write();
+			comptonSummedSpec2Clusters_1_2PixClusters[im]->Write();
+			energySpecCorr1PixClusters[im]->Write();
+			energySpecCorr2PixClusters[im]->Write();
+		}
+		comptonSpecClusters_Eunsummed[im]->Write();
 		comptonSpec2ClustersCorr[im]->Write();
-		comptonHitsSpecClustersSizeCorr[im]->Write();
-		comptonHitsClusters_nTrigsCorr[im]->Write();
+		clusterSpec2ClusterEventsCorr[im]->Write();
 		phiAngle[im]->Write();
 		phiAngleSelEvents[im]->Write();
 		dPhiPlaneAM[im]->Write();
@@ -2330,13 +2892,16 @@ int main()
 		allPixelsImage[im]->Write();
 		clusterE_vsSize[im]->Write();
 		clusterMaxE_vsSize[im]->Write();
+		thetaFromXYtE[im]->Write();
+		thetaFromXYtE_w[im]->Write();
 		thetaFromFirstClusterE[im]->Write();
 		thetaFromFirstClusterE_dPhi[im]->Write();
+		thetaFromFirstClusterE_dPhi_w[im]->Write();
+		thetaFromXYtClusterE_dPhi[im]->Write();
+		thetaFromXYtClusterE_dPhi_w[im]->Write();
 		nTrigsInEvent_norm[im]->Write();
 		clusterSize[im]->Write();
-		clusterE_nTrigs[im]->Write();
-		clusterSecE_vsSize[im]->Write();
-		clusterSizeMaxE_SecE[im]->Write();
+		clusterSize2ClusterEventsCorr[im]->Write();
 		nClustersInEvent[im]->Write();
 		nClustersInSelEvent[im]->Write();
 		firstComptonClusterSize[im]->Write();
@@ -2348,37 +2913,43 @@ int main()
 		thetaFromFirstClusterE_1pixOnly_w[im]->Write();
 		thetaFromFirstClusterE_2pixOnly[im]->Write();
 		thetaFromFirstClusterE_1_2pixOnly[im]->Write();
-		if (makeRawTimingStuff)
-		{
-			rawTimingTwoPixelClustersCorr[im]->Write();
-			rawTimingDiff2PixClusters[im]->Write();
-			rawTimingDiff3PixClusters[im]->Write();
-			if (!doNotUseCornerPixelsInPixelClusterCOGEneg) rawTimingDiff2PixDiagClusters[im]->Write();
-			rawTimingDiffAllClusters[im]->Write();			
-		}
+		clusterSpec_1ClusterEvents[im]->Write();
+		firstComptonClusterE[im]->Write();
+		secondComptonClusterE[im]->Write();
+		clusterSize_norm[im]->Write();
+		numberOfClusters[im]->Write();
+		numberOfClusters_norm[im]->Write();
+		clusterSize_nClusters[im]->Write();
+		theta_firstCluster_XYtE_Corr[im]->Write();
+		theta_firstCluster_XYtE_Corr_w[im]->Write();
+		comptonEventsDeltaZpix[im]->Write();
+		comptonEventsDeltaZdist[im]->Write();
 		if (makeTimingCalibrationStuff)
 		{
-			anodeTimingTwoPixelClustersCorr[im]->Write();
 			if (!doNotUseCornerPixelsInPixelClusterCOGEneg)
 			{
 				anodeTimingDiff2PixDiagClusters[im]->Write();
 				anodeTiming2PixDiagClustersCorr[im]->Write();
 			}
+			clusterZfromAnodeTiming[im]->Write();
 			anodeTimingDiff2PixClusters[im]->Write();
-			anodeTimingDiff3PixClusters[im]->Write();
 			anodeTiming2PixClustersCorr[im]->Write();
-			anodeTiming3PixClustersCorr[im]->Write();
 			anodeTimingDiffAllClusters[im]->Write();
-			anodeTimingTwoClustersAMCorr[im]->Write();
 			dAnodeTiming_vs_theta[im]->Write();
 			dAnodeTiming_vs_E1[im]->Write();
 			dAnodeTiming_vs_E2[im]->Write();
 			dAnodeTiming_vs_E12[im]->Write();
 			dAnodeTimingAbs_vs_E12[im]->Write();
-			dist12_vs_E1[im]->Write();
-			dist12_vs_E2[im]->Write();
-			dist12_vs_E12[im]->Write();
-			dist12_over_E12sq[im]->Write();
+			if (enableUpdateEnergyClusters)
+			{
+				dAnodeTiming_vs_sumE_1PixelClustersNeigb[im]->Write();
+				dAnodeTiming_vs_nE_1PixelClustersNeigb[im]->Write();
+				dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[im]->Write();
+				anodeTiming1PixelClustersNeigbCorr[im]->Write();
+				anodeTiming2PixelClustersNeigbCorr[im]->Write();
+				anodeTimingNeigb_nE_1PixelClusters[im]->Write();
+				anodeTimingNeigb_nE_2PixelClusters[im]->Write();
+			}
 		}
 		if (plotPixelClusterSpectra)
 		{
@@ -2389,23 +2960,30 @@ int main()
 			}
 		}
 	}
-	singleClusterSpecCorr->Write();
-	summedClusterSpecCorr->Write();
+	dPhiXYtAngle->Write();
+	dPhiXYtAngle_Ewin->Write();
+	dPhiXYtAngleNorm->Write();
+	dPhiXYtAngleNorm_Ewin->Write();
+	dPhiXYtAngle1->Write();
+	dPhiXYtAngle1_Ewin->Write();
+	dPhiXYtAngle1Norm->Write();
+	dPhiXYtAngle1Norm_Ewin->Write();
 	dPhiAngle->Write();
 	dPhiAngleNorm->Write();
 	dPhiAngle_Ewin->Write();
 	dPhiAngleNorm_Ewin->Write();
 	dPhiAngle1->Write();
 	dPhiAngle1_Ewin->Write();
+	dPhiAngle1norm->Write();
+	dPhiAngle1norm_Ewin->Write();
 	dPhiAngle_2ClusterE->Write();
-	dPhiAngle_totalE->Write();
 	phiAngleCorr->Write();
 	phiAngleSelEventsCorr->Write();
 	comptonSummedSpec2ClustersCorr->Write();
-	comptonSummedSpecEventCorr->Write();
+	comptonSummedSpec2Clusters2Heads->Write();
+	comptonSummedSpec2ClustersSelEventsCorr->Write();
+	comptonSummedSpec2ClustersSelEvents2Heads->Write();
 	theta0_theta1_FromFirstClusterE->Write();
-	nClustersInEventCorr->Write();
-	nClustersInSelEventCorr->Write();
 	hfile->Close();
 }
 
@@ -2414,11 +2992,13 @@ Bool_t analyseNextEvent(const Int_t ievent)
 	buffClusterX.clear();
 	buffClusterY.clear();
 	buffClusterE.clear();
+	buffClusterEorig.clear();
 	buffClusterArea.clear();
 	buffClusterFlag.clear();
 	buffClusterTrigs.clear();
 	buffClusterIsSplit.clear();
 	buffClusterAnodeTiming.clear();
+	buffClusterOrientation.clear();
 	eventDisplayFlag = kFALSE;
 	if (enableEventMonitor)
 	{
@@ -2429,7 +3009,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 
 	for (Int_t im = 0; im < nAMs; im++)
 	{
-		cathodeE[im] = 0;
+		cathodeE[im] = -9999;
 		if (eventDisplayFlag)
 		{
 			imageE[im]->Reset();
@@ -2451,50 +3031,16 @@ Bool_t analyseNextEvent(const Int_t ievent)
 		}
 	}
 	
-	// For now, make pairs just from two first clusters in cluster array sorted by energy
-	// First Compton interaction - second cluster (second in energy), second interaction - first cluster (maximum energy), assuming forward Compton scattering
-	for (Int_t im = 0; im < nAMs; im++)
-	{
-		if (buffClusterX[im].size() >= 2)
-		{
-			Float_t xc2 = buffClusterX[im][0]-1;
-			Float_t yc2 = buffClusterY[im][0]-1;
-			Float_t xc1 = buffClusterX[im][1]-1;
-			Float_t yc1 = buffClusterY[im][1]-1;
-			Float_t dist = TMath::Hypot(xc1-xc2,yc1-yc2);
-			Float_t phiAng = getPhiAngleDeg(xc2-xc1,yc2-yc1);
-			phiAngle[im]->Fill(phiAng);
-		}
-	}
-	Float_t totalE0 = 0;
-	Bool_t goodClusterSizes = kTRUE;
 	Bool_t skipEvent = kFALSE;
 	for (Int_t p = 0; p < buffClusterX[0].size(); p++)
 	{
-		totalE0 += buffClusterE[0][p];
-		if (buffClusterArea[0][p] < minClusterSize4PairAnalysis || buffClusterArea[0][p] > maxClusterSize4PairAnalysis) goodClusterSizes = kFALSE;
 		if (usePixelListToDisable && disabledPixels[Int_t(pixelPattern[0]->GetBinContent(buffClusterX[0][p]+1,buffClusterY[0][p]+1)+0.5)]) skipEvent = kTRUE;
 	}
-	Float_t totalE1 = 0;
 	for (Int_t p = 0; p < buffClusterX[1].size(); p++)
 	{
-		totalE1 += buffClusterE[1][p];
-		if (buffClusterArea[1][p] < minClusterSize4PairAnalysis || buffClusterArea[1][p] > maxClusterSize4PairAnalysis) goodClusterSizes = kFALSE;
 		if (usePixelListToDisable && disabledPixels[Int_t(pixelPattern[1]->GetBinContent(buffClusterX[1][p]+1,buffClusterY[1][p]+1)+0.5)]) skipEvent = kTRUE;
 	}
-	if (minClusterSize4PairAnalysis < 0 || maxClusterSize4PairAnalysis < 0) goodClusterSizes = kTRUE;
-	
-	Bool_t goodNClusters = kTRUE;
-	if(buffClusterX[0].size() < minNClusters4PairAnalysis || buffClusterX[0].size() > maxNClusters4PairAnalysis) goodNClusters = kFALSE;
-	if(buffClusterX[1].size() < minNClusters4PairAnalysis || buffClusterX[1].size() > maxNClusters4PairAnalysis) goodNClusters = kFALSE;
-	if (minNClusters4PairAnalysis < 0 || maxNClusters4PairAnalysis < 0) goodNClusters = kTRUE;
-	
-	if (buffClusterX[0].size() == 1 || buffClusterX[1].size() == 1)
-	{
-		if (buffClusterX[0].size() == 1 && buffClusterX[1].size() == 1) singleClusterSpecCorr->Fill(totalE0,totalE1);
-		summedClusterSpecCorr->Fill(totalE0,totalE1);
-	}
-	if (buffClusterX[0].size() >= 2 && buffClusterX[1].size() >= 2 && goodClusterSizes && goodNClusters && !skipEvent)
+	if (buffClusterX[0].size() >= 2 && buffClusterX[1].size() >= 2 && !skipEvent)
 	{
 		if (saveSelectedComptonRootTree && savingPointLocation == 2)
 		{
@@ -2531,6 +3077,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 		if (dist0 < maxDistanceBetweenClusters4ComptonPair && dist0 > 0.01)
 		{
 			phiAng0 = getPhiAngleDeg(xc2-xc1,yc2-yc1);
+			phiAngle[0]->Fill(phiAng0);
 			firstComptonCluster[0]->Fill(xc1+1,yc1+1);
 			secondComptonCluster[0]->Fill(xc2+1,yc2+1);
 			dPhiPlaneAM[0]->Fill(xcentre,ycentre-11);
@@ -2554,14 +3101,28 @@ Bool_t analyseNextEvent(const Int_t ievent)
 			phiAng1mirrored = getPhiAngleDeg(xc1-xc2,yc2-yc1);
 			phiAng1mirrored_shifted = phiAng1mirrored + relativePhiAngle;
 			if (phiAng1mirrored_shifted > 360) phiAng1mirrored_shifted -= 360;
+			phiAngle[1]->Fill(phiAng1mirrored_shifted);
 			firstComptonCluster[1]->Fill(xc1+1,yc1+1);
 			secondComptonCluster[1]->Fill(xc2+1,yc2+1);
 			dPhiPlaneAM[1]->Fill(xcentre,ycentre-11);
 			dPhiPlaneAM[1]->Fill(xc2+xcentre-xc1,yc2+ycentre-yc1-11);
 			phi1_valid = kTRUE;
 		}
+		
+		for (Int_t im = 0; im < nAMs; im++)
+		{
+			if (buffClusterX[im].size() != 2) continue;
+			Float_t ddist = TMath::Hypot(buffClusterX[im][firstClusterIdx[im]]-buffClusterX[im][secondClusterIdx[im]],buffClusterY[im][firstClusterIdx[im]]-buffClusterY[im][secondClusterIdx[im]]);
+			comptonEventsDeltaZpix[im]->Fill(ddist);
+			comptonEventsDeltaZdist[im]->Fill(ddist*pixelPitch);
+		}
+		
 		if (phi0_valid && phi1_valid)
 		{
+			Float_t www1 = prob_h1->GetBinContent(prob_h1->GetXaxis()->FindBin(buffClusterE[0][firstClusterIdx[0]]));
+			Float_t www2 = prob2_h1->GetBinContent(prob2_h1->GetXaxis()->FindBin(buffClusterE[0][secondClusterIdx[0]]));
+			Float_t www1a = prob_h1->GetBinContent(prob_h1->GetXaxis()->FindBin(buffClusterE[1][firstClusterIdx[1]]));
+			Float_t www2a = prob2_h1->GetBinContent(prob2_h1->GetXaxis()->FindBin(buffClusterE[1][secondClusterIdx[1]]));			
 			if (cathodeE[0] > 1 && cathodeE[1] > 1)
 			{
 				cathodeSpecSelPairs[0]->Fill(cathodeE[0]);
@@ -2571,6 +3132,11 @@ Bool_t analyseNextEvent(const Int_t ievent)
 			Float_t theta1 = getThetaFromEnergy(initialE1, buffClusterE[1][firstClusterIdx[1]]);
 			Float_t theta0a = getThetaFromEnergy(Na22Energy, buffClusterE[0][secondClusterIdx[0]]);
 			Float_t theta1a = getThetaFromEnergy(initialE1, buffClusterE[1][secondClusterIdx[1]]);
+			
+			Float_t theta0a_xyt = getThetaAngleFromHitsXYt(0,buffClusterX[0][firstClusterIdx[0]],buffClusterX[0][secondClusterIdx[0]],buffClusterY[0][firstClusterIdx[0]],buffClusterY[0][secondClusterIdx[0]],buffClusterAnodeTiming[0][firstClusterIdx[0]],buffClusterAnodeTiming[0][secondClusterIdx[0]]);
+			Float_t theta1a_xyt = getThetaAngleFromHitsXYt(1,buffClusterX[1][firstClusterIdx[1]],buffClusterX[1][secondClusterIdx[1]],buffClusterY[1][firstClusterIdx[1]],buffClusterY[1][secondClusterIdx[1]],buffClusterAnodeTiming[1][firstClusterIdx[1]],buffClusterAnodeTiming[1][secondClusterIdx[1]]);
+			Float_t theta0_xyt = 180 - theta0a_xyt;
+			Float_t theta1_xyt = 180 - theta1a_xyt;
 			
 			phiAngleCorr->Fill(phiAng0,phiAng1mirrored_shifted);
 			Float_t dPh = phiAng0-phiAng1mirrored_shifted;
@@ -2594,120 +3160,243 @@ Bool_t analyseNextEvent(const Int_t ievent)
 				dAnodeTimingAbs_vs_E12[1]->Fill(buffClusterE[1][firstClusterIdx[1]],TMath::Abs(buffClusterAnodeTiming[1][secondClusterIdx[1]]-buffClusterAnodeTiming[1][firstClusterIdx[1]]));
 				dAnodeTimingAbs_vs_E12[0]->Fill(buffClusterE[0][secondClusterIdx[0]],TMath::Abs(buffClusterAnodeTiming[0][firstClusterIdx[0]]-buffClusterAnodeTiming[0][secondClusterIdx[0]]));
 				dAnodeTimingAbs_vs_E12[1]->Fill(buffClusterE[1][secondClusterIdx[1]],TMath::Abs(buffClusterAnodeTiming[1][firstClusterIdx[1]]-buffClusterAnodeTiming[1][secondClusterIdx[1]]));
-				Float_t ddist1 = TMath::Sq(buffClusterX[0][secondClusterIdx[0]] - buffClusterX[0][firstClusterIdx[0]]);
-				ddist1 += TMath::Sq(buffClusterY[0][secondClusterIdx[0]] - buffClusterY[0][firstClusterIdx[0]]);
-				ddist1 += TMath::Sq((buffClusterAnodeTiming[0][secondClusterIdx[0]] - buffClusterAnodeTiming[0][firstClusterIdx[0]])/factor2ConvertAnodeTime2Distance);
-				ddist1 = TMath::Sqrt(ddist1);
-				dist12_vs_E1[0]->Fill(TMath::Power(buffClusterE[0][firstClusterIdx[0]],2.2),ddist1);
-				dist12_vs_E2[0]->Fill(TMath::Power(buffClusterE[0][secondClusterIdx[0]],2.2),ddist1);
-				dist12_vs_E12[0]->Fill(TMath::Power(buffClusterE[0][firstClusterIdx[0]],2.2),ddist1);
-				dist12_vs_E12[0]->Fill(TMath::Power(buffClusterE[0][secondClusterIdx[0]],2.2),ddist1);
-				Float_t ddist2 = TMath::Sq(buffClusterX[1][secondClusterIdx[1]] - buffClusterX[1][firstClusterIdx[1]]);
-				ddist2 += TMath::Sq(buffClusterY[1][secondClusterIdx[1]] - buffClusterY[1][firstClusterIdx[1]]);
-				ddist2 += TMath::Sq((buffClusterAnodeTiming[1][secondClusterIdx[1]] - buffClusterAnodeTiming[1][firstClusterIdx[1]])/factor2ConvertAnodeTime2Distance);
-				ddist2 = TMath::Sqrt(ddist2);
-				dist12_vs_E1[1]->Fill(TMath::Power(buffClusterE[1][firstClusterIdx[1]],2.2),ddist2);
-				dist12_vs_E2[1]->Fill(TMath::Power(buffClusterE[1][secondClusterIdx[1]],2.2),ddist2);
-				dist12_vs_E12[1]->Fill(TMath::Power(buffClusterE[1][firstClusterIdx[1]],2.2),ddist2);
-				dist12_vs_E12[1]->Fill(TMath::Power(buffClusterE[1][secondClusterIdx[1]],2.2),ddist2);
-				dist12_over_E12sq[0]->Fill(ddist1*1000/TMath::Power(buffClusterE[0][0],2.2),ddist1*1000/TMath::Power(buffClusterE[0][1],2.2));
-				dist12_over_E12sq[1]->Fill(ddist2*1000/TMath::Power(buffClusterE[1][0],2.2),ddist2*1000/TMath::Power(buffClusterE[1][1],2.2));
 			}
-			if (theta0 > ThetaWindowFor4PhiAnalyis_min && theta0 < ThetaWindowFor4PhiAnalyis_max && theta1 > ThetaWindowFor4PhiAnalyis_min && theta1 < ThetaWindowFor4PhiAnalyis_max && cathodeE[0] < 540 && cathodeE[1] < 540) 
+			Bool_t skipEvent_cathode = kFALSE;
+			if (eventHasToHaveCathodeSignal)
 			{
-				phiAngleSelEventsCorr->Fill(phiAng0,phiAng1mirrored_shifted);
-				phiAngleSelEvents[0]->Fill(phiAng0);
-				phiAngleSelEvents[1]->Fill(phiAng1mirrored_shifted);
-				nClustersInSelEvent[0]->Fill(buffClusterX[0].size());
-				nClustersInSelEvent[1]->Fill(buffClusterX[1].size());
-				nClustersInSelEventCorr->Fill(buffClusterX[0].size(),buffClusterX[1].size());
-				comptonHitsSpecClustersSizeCorr[0]->Fill(buffClusterArea[0][firstClusterIdx[0]],buffClusterArea[0][secondClusterIdx[0]]);
-				comptonHitsSpecClustersSizeCorr[1]->Fill(buffClusterArea[1][firstClusterIdx[1]],buffClusterArea[1][secondClusterIdx[1]]);
-				firstComptonClusterSizeSelEvents[0]->Fill(buffClusterArea[0][firstClusterIdx[0]]);
-				secondComptonClusterSizeSelEvents[0]->Fill(buffClusterArea[0][secondClusterIdx[0]]);
-				firstComptonClusterSizeSelEvents[1]->Fill(buffClusterArea[1][firstClusterIdx[1]]);
-				secondComptonClusterSizeSelEvents[1]->Fill(buffClusterArea[1][secondClusterIdx[1]]);
-				dPhiAngle->Fill(dPh);
-				dPhiAngleNorm->Fill(dPh);
-				dPhiAngle1->Fill(TMath::Abs(dPh));
-				plotEvent = kTRUE;
-				if (totalE0 >= EwindowFor4PhiAnalyis_min && totalE0 <= EwindowFor4PhiAnalyis_max && totalE1 >= EwindowFor4PhiAnalyis_min && totalE1 <= EwindowFor4PhiAnalyis_max)
+				if (cathodeE[0] < -9000) skipEvent_cathode = kTRUE;
+				if (cathodeE[1] < -9000) skipEvent_cathode = kTRUE;
+			}
+			if (cathodeE[0] > maxCathodeEnergy || cathodeE[1] > maxCathodeEnergy) skipEvent_cathode = kTRUE;
+		
+			// true is good
+			Bool_t thetaWindowCut = kTRUE;
+			if (makeAsymmetricThetaWindow)
+			{
+				if (!((theta0 > Theta1WindowFor4PhiAnalyis_min && theta0 < Theta1WindowFor4PhiAnalyis_max && theta1 > Theta2WindowFor4PhiAnalyis_min && theta1 < Theta2WindowFor4PhiAnalyis_max)
+						|| (theta0 > Theta2WindowFor4PhiAnalyis_min && theta0 < Theta2WindowFor4PhiAnalyis_max && theta1 > Theta1WindowFor4PhiAnalyis_min && theta1 < Theta1WindowFor4PhiAnalyis_max)))
+									thetaWindowCut = kFALSE;
+			}
+			else
+			{
+				if (theta0 <= Theta1WindowFor4PhiAnalyis_min || theta0 >= Theta1WindowFor4PhiAnalyis_max) thetaWindowCut = kFALSE;
+				if (theta1 <= Theta2WindowFor4PhiAnalyis_min || theta1 >= Theta2WindowFor4PhiAnalyis_max) thetaWindowCut = kFALSE;
+			}
+			
+			Bool_t thetaXYtWindowCut = kTRUE;
+			if (makeAsymmetricThetaWindow)
+			{
+				if (!((theta0_xyt > Theta1WindowFor4PhiAnalyis_min && theta0_xyt < Theta1WindowFor4PhiAnalyis_max && theta1_xyt > Theta2WindowFor4PhiAnalyis_min && theta1_xyt < Theta2WindowFor4PhiAnalyis_max)
+						|| (theta0_xyt > Theta2WindowFor4PhiAnalyis_min && theta0_xyt < Theta2WindowFor4PhiAnalyis_max && theta1_xyt > Theta1WindowFor4PhiAnalyis_min && theta1_xyt < Theta1WindowFor4PhiAnalyis_max)))
+									thetaXYtWindowCut = kFALSE;
+			}
+			else
+			{
+				if (theta0_xyt <= Theta1WindowFor4PhiAnalyis_min || theta0_xyt >= Theta1WindowFor4PhiAnalyis_max) thetaXYtWindowCut = kFALSE;
+				if (theta1_xyt <= Theta2WindowFor4PhiAnalyis_min || theta1_xyt >= Theta2WindowFor4PhiAnalyis_max) thetaXYtWindowCut = kFALSE;
+			}
+		
+			Bool_t EnergyWindowCut = kTRUE;
+			if (sum2clE0 <= Ewindow4PhiAnalyis_min || sum2clE0 >= Ewindow4PhiAnalyis_max) EnergyWindowCut = kFALSE;
+			if (sum2clE1 <= Ewindow4PhiAnalyis_min || sum2clE1 >= Ewindow4PhiAnalyis_max) EnergyWindowCut = kFALSE;
+		
+			if (!skipEvent_cathode)
+			{
+				if (thetaWindowCut) 
 				{
-					dPhiAngle_Ewin->Fill(dPh);
-					dPhiAngle1_Ewin->Fill(TMath::Abs(dPh));
-					dPhiAngleNorm_Ewin->Fill(dPh);
+					comptonSummedSpec2ClustersSelEventsCorr->Fill(sum2clE0,sum2clE1);
+					comptonSummedSpec2ClustersSelEvents2Heads->Fill(sum2clE0+sum2clE1);
+					phiAngleSelEventsCorr->Fill(phiAng0,phiAng1mirrored_shifted);
+					phiAngleSelEvents[0]->Fill(phiAng0);
+					phiAngleSelEvents[1]->Fill(phiAng1mirrored_shifted);
+					nClustersInSelEvent[0]->Fill(buffClusterX[0].size());
+					nClustersInSelEvent[1]->Fill(buffClusterX[1].size());
+					firstComptonClusterSizeSelEvents[0]->Fill(buffClusterArea[0][firstClusterIdx[0]]);
+					secondComptonClusterSizeSelEvents[0]->Fill(buffClusterArea[0][secondClusterIdx[0]]);
+					firstComptonClusterSizeSelEvents[1]->Fill(buffClusterArea[1][firstClusterIdx[1]]);
+					secondComptonClusterSizeSelEvents[1]->Fill(buffClusterArea[1][secondClusterIdx[1]]);
+					dPhiAngle->Fill(dPh);
+					dPhiAngleNorm->Fill(dPh);
+					dPhiAngle1->Fill(TMath::Abs(dPh));
+					dPhiAngle1norm->Fill(TMath::Abs(dPh));
+					plotEvent = kTRUE;
+					if (EnergyWindowCut)
+					{
+						dPhiAngle_Ewin->Fill(dPh);
+						dPhiAngle1_Ewin->Fill(TMath::Abs(dPh));
+						dPhiAngle1norm_Ewin->Fill(TMath::Abs(dPh));
+						dPhiAngleNorm_Ewin->Fill(dPh);
+					}
 				}
-				if (makeTimingCalibrationStuff && buffClusterX[0].size() == 2 && buffClusterX[1].size() == 2)
+				if (thetaWindowCut) 
 				{
-					anodeTimingTwoClustersAMCorr[0]->Fill(buffClusterAnodeTiming[0][firstClusterIdx[0]],buffClusterAnodeTiming[0][secondClusterIdx[0]]);
-					anodeTimingTwoClustersAMCorr[1]->Fill(buffClusterAnodeTiming[1][firstClusterIdx[1]],buffClusterAnodeTiming[1][secondClusterIdx[1]]);
+					dPhiXYtAngle->Fill(dPh);
+					dPhiXYtAngleNorm->Fill(dPh);
+					dPhiXYtAngle1->Fill(dPh);
+					dPhiXYtAngle1Norm->Fill(dPh);
+					if (EnergyWindowCut)
+					{
+						dPhiXYtAngle_Ewin->Fill(dPh);
+						dPhiXYtAngleNorm_Ewin->Fill(dPh);
+						dPhiXYtAngle1_Ewin->Fill(dPh);
+						dPhiXYtAngle1Norm_Ewin->Fill(dPh);
+					}
+				}				
+				if (theta0 > Theta1WindowFor4PhiAnalyis_min && theta0 < Theta1WindowFor4PhiAnalyis_max && theta1 > Theta1WindowFor4PhiAnalyis_min && theta1 < Theta1WindowFor4PhiAnalyis_max)	
+				{
+					dPhiAngle_w->Fill(dPh,www1*www1a);
+					dPhiAngleNorm_w->Fill(dPh,www1*www1a);
+					if (EnergyWindowCut)
+					{
+						dPhiAngle_Ewin_w->Fill(dPh,www1*www1a);
+						dPhiAngleNorm_Ewin_w->Fill(dPh,www1*www1a);
+					}
+				}
+				if (theta0 > Theta1WindowFor4PhiAnalyis_min && theta0 < Theta1WindowFor4PhiAnalyis_max && theta1a > Theta1WindowFor4PhiAnalyis_min && theta1a < Theta1WindowFor4PhiAnalyis_max)	
+				{
+					dPhiAngle_w->Fill(dPh,www1*www2a);
+					dPhiAngleNorm_w->Fill(dPh,www1*www2a);
+					if (EnergyWindowCut)
+					{
+						dPhiAngle_Ewin_w->Fill(dPh,www1*www2a);
+						dPhiAngleNorm_Ewin_w->Fill(dPh,www1*www2a);
+					}
+				}
+				if (theta0a > Theta1WindowFor4PhiAnalyis_min && theta0a < Theta1WindowFor4PhiAnalyis_max && theta1 > Theta1WindowFor4PhiAnalyis_min && theta1 < Theta1WindowFor4PhiAnalyis_max)	
+				{
+					dPhiAngle_w->Fill(dPh,www2*www1a);
+					dPhiAngleNorm_w->Fill(dPh,www2*www1a);
+					if (EnergyWindowCut)
+					{
+						dPhiAngle_Ewin_w->Fill(dPh,www2*www1a);
+						dPhiAngleNorm_Ewin_w->Fill(dPh,www2*www1a);
+					}
+				}
+				if (theta0a > Theta1WindowFor4PhiAnalyis_min && theta0a < Theta1WindowFor4PhiAnalyis_max && theta1a > Theta1WindowFor4PhiAnalyis_min && theta1a < Theta1WindowFor4PhiAnalyis_max)	
+				{
+					dPhiAngle_w->Fill(dPh,www1*www2a);
+					dPhiAngleNorm_w->Fill(dPh,www1*www2a);
+					if (EnergyWindowCut)
+					{
+						dPhiAngle_Ewin_w->Fill(dPh,www1*www2a);
+						dPhiAngleNorm_Ewin_w->Fill(dPh,www1*www2a);
+					}
+				}
+			
+				dPhiAngle_2ClusterE->Fill(sum2clE0,dPh);
+				dPhiAngle_2ClusterE->Fill(sum2clE1,dPh);
+				if (EnergyWindowCut)
+				{
+					thetaFromFirstClusterE[0]->Fill(theta0);
+					thetaFromFirstClusterE[1]->Fill(theta1);
+					thetaFromFirstClusterE_w[0]->Fill(theta0,www1);
+					thetaFromFirstClusterE_w[0]->Fill(theta0a,www2);
+					thetaFromFirstClusterE_w[1]->Fill(theta1,www1a);
+					thetaFromFirstClusterE_w[1]->Fill(theta1a,www2a);
+					thetaFromXYtE[0]->Fill(theta0_xyt);
+					thetaFromXYtE[1]->Fill(theta1_xyt);
+					thetaFromXYtE_w[0]->Fill(theta0_xyt,www1);
+					thetaFromXYtE_w[1]->Fill(theta1_xyt,www1a);
+					thetaFromXYtE_w[0]->Fill(theta0a_xyt,www2);
+					thetaFromXYtE_w[1]->Fill(theta1a_xyt,www2a);
+					
+					theta_firstCluster_XYtE_Corr[0]->Fill(theta0,theta0_xyt);
+					theta_firstCluster_XYtE_Corr[1]->Fill(theta1,theta1_xyt);
+					
+					theta_firstCluster_XYtE_Corr_w[0]->Fill(theta0,theta0_xyt,www1);
+					theta_firstCluster_XYtE_Corr_w[0]->Fill(theta0a,theta0a_xyt,www2);
+					theta_firstCluster_XYtE_Corr_w[1]->Fill(theta1,theta1_xyt,www1a);
+					theta_firstCluster_XYtE_Corr_w[1]->Fill(theta1a,theta1a_xyt,www2a);
+					
+					if (buffClusterArea[0][firstClusterIdx[0]] == 1 && buffClusterArea[0][secondClusterIdx[0]] == 1)
+					{
+						thetaFromFirstClusterE_1pixOnly[0]->Fill(theta0);
+						thetaFromFirstClusterE_1pixOnly_w[0]->Fill(theta0);
+						thetaFromFirstClusterE_1pixOnly_w[0]->Fill(theta0a);
+					}
+					if (buffClusterArea[1][firstClusterIdx[1]] == 1 && buffClusterArea[1][secondClusterIdx[1]] == 1)
+					{
+						thetaFromFirstClusterE_1pixOnly[1]->Fill(theta1);
+						thetaFromFirstClusterE_1pixOnly_w[1]->Fill(theta1);
+						thetaFromFirstClusterE_1pixOnly_w[1]->Fill(theta1);
+					}
+					if (buffClusterArea[0][firstClusterIdx[0]] == 2 && buffClusterArea[0][secondClusterIdx[0]] == 2) thetaFromFirstClusterE_2pixOnly[0]->Fill(theta0);
+					if (buffClusterArea[1][firstClusterIdx[1]] == 2 && buffClusterArea[1][secondClusterIdx[1]] == 2) thetaFromFirstClusterE_2pixOnly[1]->Fill(theta1);
+					if (buffClusterArea[0][firstClusterIdx[0]] == 1 && buffClusterArea[0][secondClusterIdx[0]] == 2) thetaFromFirstClusterE_1_2pixOnly[0]->Fill(theta0);
+					if (buffClusterArea[1][firstClusterIdx[1]] == 1 && buffClusterArea[1][secondClusterIdx[1]] == 2) thetaFromFirstClusterE_1_2pixOnly[1]->Fill(theta1);
+					if (buffClusterArea[0][firstClusterIdx[0]] == 2 && buffClusterArea[0][secondClusterIdx[0]] == 1) thetaFromFirstClusterE_1_2pixOnly[0]->Fill(theta0);
+					if (buffClusterArea[1][firstClusterIdx[1]] == 2 && buffClusterArea[1][secondClusterIdx[1]] == 1) thetaFromFirstClusterE_1_2pixOnly[1]->Fill(theta1);
+					
+					thetaFromFirstClusterE_dPhi[0]->Fill(theta0,dPh);
+					thetaFromFirstClusterE_dPhi[1]->Fill(theta1,dPh);
+					
+					thetaFromXYtClusterE_dPhi[0]->Fill(theta0_xyt,dPh);
+					thetaFromXYtClusterE_dPhi[1]->Fill(theta1_xyt,dPh);
+					
+					if (theta0 > 60) thetaFromFirstClusterE_dPhi_w[0]->Fill(theta0,dPh,www1);
+					if (theta0a > 60) thetaFromFirstClusterE_dPhi_w[0]->Fill(theta0a,dPh,www2);
+					if (theta1 > 60) thetaFromFirstClusterE_dPhi_w[1]->Fill(theta1,dPh,www1a);
+					if (theta1a > 60) thetaFromFirstClusterE_dPhi_w[1]->Fill(theta1a,dPh,www2a);
+					
+					if (theta0_xyt > 60) thetaFromXYtClusterE_dPhi_w[0]->Fill(theta0_xyt,dPh,www1);
+					if (theta0a_xyt > 60) thetaFromXYtClusterE_dPhi_w[0]->Fill(theta0a_xyt,dPh,www2);
+					if (theta1_xyt > 60) thetaFromXYtClusterE_dPhi_w[1]->Fill(theta1_xyt,dPh,www1a);
+					if (theta1a_xyt > 60) thetaFromXYtClusterE_dPhi_w[1]->Fill(theta1a_xyt,dPh,www2a);					
+					
+					theta0_theta1_FromFirstClusterE->Fill(theta0,theta1);
 				}
 			}
-			dPhiAngle_2ClusterE->Fill(sum2clE0,dPh);
-			dPhiAngle_2ClusterE->Fill(sum2clE1,dPh);
-			thetaFromFirstClusterE[0]->Fill(theta0);
-			thetaFromFirstClusterE[1]->Fill(theta1);
-			thetaFromFirstClusterE_w[0]->Fill(theta0);
-			thetaFromFirstClusterE_w[1]->Fill(theta1);
-			thetaFromFirstClusterE_w[0]->Fill(theta0a);
-			thetaFromFirstClusterE_w[1]->Fill(theta1a);
-			if (buffClusterArea[0][firstClusterIdx[0]] == 1 && buffClusterArea[0][secondClusterIdx[0]] == 1)
-			{
-				thetaFromFirstClusterE_1pixOnly[0]->Fill(theta0);
-				thetaFromFirstClusterE_1pixOnly_w[0]->Fill(theta0);
-				thetaFromFirstClusterE_1pixOnly_w[0]->Fill(theta0a);
-			}
-			if (buffClusterArea[1][firstClusterIdx[1]] == 1 && buffClusterArea[1][secondClusterIdx[1]] == 1)
-			{
-				thetaFromFirstClusterE_1pixOnly[1]->Fill(theta1);
-				thetaFromFirstClusterE_1pixOnly_w[1]->Fill(theta1);
-				thetaFromFirstClusterE_1pixOnly_w[1]->Fill(theta1);
-			}
-			if (buffClusterArea[0][firstClusterIdx[0]] == 2 && buffClusterArea[0][secondClusterIdx[0]] == 2) thetaFromFirstClusterE_2pixOnly[0]->Fill(theta0);
-			if (buffClusterArea[1][firstClusterIdx[1]] == 2 && buffClusterArea[1][secondClusterIdx[1]] == 2) thetaFromFirstClusterE_2pixOnly[1]->Fill(theta1);
-			if (buffClusterArea[0][firstClusterIdx[0]] == 1 && buffClusterArea[0][secondClusterIdx[0]] == 2) thetaFromFirstClusterE_1_2pixOnly[0]->Fill(theta0);
-			if (buffClusterArea[1][firstClusterIdx[1]] == 1 && buffClusterArea[1][secondClusterIdx[1]] == 2) thetaFromFirstClusterE_1_2pixOnly[1]->Fill(theta1);
-			if (buffClusterArea[0][firstClusterIdx[0]] == 2 && buffClusterArea[0][secondClusterIdx[0]] == 1) thetaFromFirstClusterE_1_2pixOnly[0]->Fill(theta0);
-			if (buffClusterArea[1][firstClusterIdx[1]] == 2 && buffClusterArea[1][secondClusterIdx[1]] == 1) thetaFromFirstClusterE_1_2pixOnly[1]->Fill(theta1);
-			thetaFromFirstClusterE_dPhi[0]->Fill(theta0,dPh);
-			thetaFromFirstClusterE_dPhi[1]->Fill(theta1,dPh);
-			theta0_theta1_FromFirstClusterE->Fill(theta0,theta1);
-			dPhiAngle_totalE->Fill(totalE0,dPh);
-			dPhiAngle_totalE->Fill(totalE1,dPh);
 		}
 		comptonSummedSpec2ClustersCorr->Fill(sum2clE0,sum2clE1);
-		comptonSummedSpecEventCorr->Fill(totalE0,totalE1);
-		summedClusterSpecCorr->Fill(sum2clE0,sum2clE1);
-		comptonSummedSpecEventClusters[0]->Fill(totalE0);
-		comptonSummedSpecEventClusters[1]->Fill(totalE1);
+		comptonSummedSpec2Clusters2Heads->Fill(sum2clE0+sum2clE1);
+	}
+
+	Float_t tEE1 = buffClusterE[0][firstClusterIdx[0]]+buffClusterE[0][secondClusterIdx[0]];
+	Float_t tEE2 = buffClusterE[1][firstClusterIdx[1]]+buffClusterE[1][secondClusterIdx[1]];
+	Bool_t EnergyWindowCut2 = kTRUE;
+	if (tEE1 <= Ewindow4PhiAnalyis_min || tEE1 >= Ewindow4PhiAnalyis_max) EnergyWindowCut2 = kFALSE;
+	if (tEE2 <= Ewindow4PhiAnalyis_min || tEE2 >= Ewindow4PhiAnalyis_max) EnergyWindowCut2 = kFALSE;
+
+	if (buffClusterX[0].size() == 2 && buffClusterX[1].size() == 2 && EnergyWindowCut2)
+	{
+		firstComptonClusterE[0]->Fill(buffClusterE[0][firstClusterIdx[0]]);
+		secondComptonClusterE[0]->Fill(buffClusterE[0][secondClusterIdx[0]]);
+		firstComptonClusterE[1]->Fill(buffClusterE[1][firstClusterIdx[1]]);
+		secondComptonClusterE[1]->Fill(buffClusterE[1][secondClusterIdx[1]]);
 	}
 
 	for (Int_t im = 0; im < nAMs; im++)
 	{
-		if (buffClusterX[im].size() >= 2)
+		if (buffClusterX[im].size() == 2)
 		{
-			for (Int_t p = 0; p < 2; p++) comptonSpecClusters[im]->Fill(buffClusterE[im][p]);
-			comptonSummedSpec2Clusters[im]->Fill(buffClusterE[im][0] + buffClusterE[im][1]);
-			summedClusterEventsSpec[im]->Fill(buffClusterE[im][0] + buffClusterE[im][1]);
+			for (Int_t p = 0; p < 2; p++)
+			{
+				if (enableUpdateEnergyClusters) comptonSpecClusters[im]->Fill(buffClusterE[im][p]);
+				comptonSpecClusters_Eunsummed[im]->Fill(buffClusterEorig[im][p]);
+			}
+			if (enableUpdateEnergyClusters) comptonSummedSpec2Clusters[im]->Fill(buffClusterE[im][0] + buffClusterE[im][1]);
+			comptonSummedSpec2Clusters_Eunsummed[im]->Fill(buffClusterEorig[im][0] + buffClusterEorig[im][1]);
+			if (buffClusterArea[im][0] == 1 && buffClusterArea[im][1] == 1)
+			{
+				if (enableUpdateEnergyClusters) comptonSummedSpec2Clusters_1PixClusters[im]->Fill(buffClusterE[im][0] + buffClusterE[im][1]);
+				comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->Fill(buffClusterEorig[im][0] + buffClusterEorig[im][1]);
+			}
+			if (buffClusterArea[im][0] == 2 && buffClusterArea[im][1] == 2)
+			{
+				if (enableUpdateEnergyClusters) comptonSummedSpec2Clusters_2PixClusters[im]->Fill(buffClusterE[im][0] + buffClusterE[im][1]);
+				comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->Fill(buffClusterEorig[im][0] + buffClusterEorig[im][1]);
+			}
+			if ((buffClusterArea[im][0] == 1 && buffClusterArea[im][1] == 2) || (buffClusterArea[im][0] == 2 && buffClusterArea[im][1] == 1))
+			{
+				if (enableUpdateEnergyClusters) comptonSummedSpec2Clusters_1_2PixClusters[im]->Fill(buffClusterE[im][0] + buffClusterE[im][1]);
+				comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->Fill(buffClusterEorig[im][0] + buffClusterEorig[im][1]);
+			}
 			comptonSpec2ClustersCorr[im]->Fill(buffClusterE[im][0],buffClusterE[im][1]);
-			comptonHitsSpecClustersSizeCorr[im]->Fill(buffClusterArea[im][0],buffClusterArea[im][1]);
-			comptonHitsClusters_nTrigsCorr[im]->Fill(buffClusterTrigs[im][0],buffClusterTrigs[im][1]);
-			clusterMaxE_vsSize[im]->Fill(buffClusterE[im][0],buffClusterArea[im][0]);
-			clusterSecE_vsSize[im]->Fill(buffClusterE[im][1],buffClusterArea[im][1]);
-			clusterSizeMaxE_SecE[im]->Fill(buffClusterArea[im][0],buffClusterArea[im][1]);
-		}
-		if (buffClusterX[im].size() == 1)
-		{
-			singleClusterEventsSpec[im]->Fill(buffClusterE[im][0]);
-			summedClusterEventsSpec[im]->Fill(buffClusterE[im][0]);
 		}
 		for (Int_t p = 0; p < buffClusterX[im].size(); p++)
 		{
 			clusterE_vsSize[im]->Fill(buffClusterE[im][p],buffClusterArea[im][p]);
-			clusterSize[im]->Fill(buffClusterArea[im][p]);
 			allClustersSpec[im]->Fill(buffClusterE[im][p]);
-			nTrigs_clusterSize[im]->Fill(buffClusterArea[im][p],buffClusterTrigs[im][p]);
-			clusterE_nTrigs[im]->Fill(buffClusterE[im][p],buffClusterTrigs[im][p]);
 			if (usePixelListToDisable && disabledPixels[Int_t(pixelPattern[im]->GetBinContent(buffClusterX[im][p]+1,buffClusterY[im][p]+1)+0.5)]) continue;
 			allClustersCOGImage[im]->Fill(buffClusterX[im][p],buffClusterY[im][p],buffClusterE[im][p]);
 			allClustersCOGFreqImage[im]->Fill(buffClusterX[im][p],buffClusterY[im][p]);
@@ -2717,7 +3406,6 @@ Bool_t analyseNextEvent(const Int_t ievent)
 		}
 		if (buffClusterX[im].size() > 0) nClustersInEvent[im]->Fill(buffClusterX[im].size());
 	}
-	if (buffClusterX[0].size() > 0 && buffClusterX[1].size() > 0) nClustersInEventCorr->Fill(buffClusterX[0].size(),buffClusterX[1].size());
 
 	if (plotEvent)
 	{
@@ -2754,18 +3442,22 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 	buffClusterXloc.clear();
 	buffClusterYloc.clear();
 	buffClusterEloc.clear();
+	buffClusterEorigloc.clear();
 	buffClusterArealoc.clear();
 	buffClusterFlagloc.clear();
 	buffClusterTrigsloc.clear();
 	buffClusterIsSplitloc.clear();
+	buffClusterOrientationloc.clear();
 	buffClusterAnodeTimingloc.clear();
 	buffClusterXloc.resize(0,0);
 	buffClusterYloc.resize(0,0);
 	buffClusterEloc.resize(0,0);
+	buffClusterEorigloc.resize(0,0);
 	buffClusterArealoc.resize(0,0);
 	buffClusterFlagloc.resize(0,0);
 	buffClusterTrigsloc.resize(0,0);
 	buffClusterIsSplitloc.resize(0,0);
+	buffClusterOrientationloc.resize(0,0);
 	buffClusterAnodeTimingloc.resize(0,0);
 	matrix_trigs.clear();
 	matrix_trigs.resize(nPixXY, vector<Int_t>(nPixXY));
@@ -2773,16 +3465,27 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 	matrix_flags.resize(nPixXY, vector<Int_t>(nPixXY));
 	matrix_E.clear();
 	matrix_E.resize(nPixXY, vector<Float_t>(nPixXY));
+	matrix_Eall.clear();
+	matrix_Eall.resize(nPixXY, vector<Float_t>(nPixXY));
 	matrix_Eneg.clear();
 	matrix_Eneg.resize(nPixXY, vector<Float_t>(nPixXY));
 	matrix_time.clear();
 	matrix_time.resize(nPixXY, vector<Int_t>(nPixXY));
 	matrix_timeCalib.clear();
 	matrix_timeCalib.resize(nPixXY, vector<Float_t>(nPixXY));
+	matrix_trigs_4sum.clear();
+	matrix_trigs_4sum.resize(nPixXY, vector<Int_t>(nPixXY));
+	buff_E_neighb_4sum.clear();
+	buff_E_neighb_4sum.resize(0,0);
+	buff_X_neighb_4sum.clear();
+	buff_X_neighb_4sum.resize(0,0);
+	buff_Y_neighb_4sum.clear();
+	buff_Y_neighb_4sum.resize(0,0);
+
 	firstAMTreeEventIdx[AM2do] = 0;
 	lastAMTreeEventIdx[AM2do] = 0;
 
-	//cout << "=============Start=============" << endl;
+	//cout << Form("========Start==AM%d===event %d=====",AM2do,evt) << endl;
 	for (Int_t ii = 0; ii < Nev[AM2do] && event[AM2do] != evt; ii++)
 	{
 		cntEntryTree[AM2do]++;
@@ -2809,9 +3512,9 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 				if (triggerFlag[AM2do] == 1)
 				{
 					matrix_time[xx1-1][yy1-1] = timeDetect[AM2do];
-					matrix_timeCalib[xx1-1][yy1-1] = (timeDetect[AM2do]-tCalibAnodes[pixel[AM2do]][1]+rand3->Uniform(1.))/tCalibAnodes[pixel[AM2do]][0];				
+					//matrix_timeCalib[xx1-1][yy1-1] = (timeDetect[AM2do]-tCalibAnodes[pixel[AM2do]][1]+rand3->Uniform(1.))/tCalibAnodes[pixel[AM2do]][0];				
 				}
-				//cout << Form("%d, %d - timing %d, trigFlag = %d",xx1,yy1,timeDetect[AM2do],triggerFlag[AM2do])<< endl;
+				matrix_timeCalib[xx1-1][yy1-1] = (timeDetect[AM2do]-tCalibAnodes[pixel[AM2do]][1]+rand3->Uniform(1.))/tCalibAnodes[pixel[AM2do]][0];
 				if (E[AM2do] > minPixelEnergyThr4ClusterReconstruction)
 				{
 					if ((useOnlyTriggeredPixelsInCluster && triggerFlag[AM2do] == 1) || !useOnlyTriggeredPixelsInCluster)
@@ -2819,6 +3522,7 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 						status = kTRUE;
 						matrix_E[xx1-1][yy1-1] = E[AM2do];
 						matrix_trigs[xx1-1][yy1-1] = triggerFlag[AM2do];
+						//matrix_trigs_4sum[xx1-1][yy1-1] = triggerFlag[AM2do];
 						matrix_flags[xx1-1][yy1-1] = newNeighbourFlag;
 						if (eventDisplayFlag)
 						{
@@ -2827,7 +3531,14 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 							if (triggerFlag[AM2do] == 1) imageT[AM2do]->Fill(xx1-0.5,yy1-0.5);
 						}
 					}
+					if (triggerFlag[AM2do] != 1)
+					{
+						buff_E_neighb_4sum.push_back(E[AM2do]);
+						buff_X_neighb_4sum.push_back(xx1-1);
+						buff_Y_neighb_4sum.push_back(yy1-1);
+					}
 				}
+				matrix_Eall[xx1-1][yy1-1] = E[AM2do];
 			}
 		}
 		if (pixel[AM2do] == getCath1Channel(AM2do,GM[AM2do],0))
@@ -2842,7 +3553,6 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 	chain1p[AM2do]->GetEntry(cntEntryTree[AM2do]);
 	lastAMTreeEventIdx[AM2do] = cntEntryTree[AM2do];
 	if (!status) return status;
-	
 	Int_t clusterCounter = 0;
 	Bool_t skipFrame = kFALSE;
 	Float_t primaryClusterE = 0;
@@ -2960,24 +3670,23 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 			Float_t xcen = CoGx/totAmp;
 			Float_t ycen = CoGy/totAmp;
 			if (nTrigsInCluster > 0) meanT /= nTrigsInCluster;
-			Float_t namp;
-			if (updateSinglePixelClusterCOGEneg && area == 1 && pixelStatusGlobal[AM2do][Int_t(xcen)][Int_t(ycen)] != -1)
+			
+			for (Int_t ia = 0; ia < buffClusterXarr.size(); ia++)
 			{
-				namp = updateSinglePixelClusterCOGwithEneg(Int_t(xcen),Int_t(ycen),CoGx,CoGy);
-				xcen = CoGx/namp;
-				ycen = CoGy/namp;
+				matrix_trigs_4sum[buffClusterXarr[ia]][buffClusterYarr[ia]] = clusterCounter;
 			}
-			Int_t stat = 0;
-			if (updateTwoPixelClusterCOGEneg && area == 2)
+			
+			Int_t orient = 0; // 0 - horizontal (X) orientation, 1 - vertical (Y) orientation
+			if (area == 2)
+				if (buffClusterYarr[0] == buffClusterYarr[1]) orient = 1;
+			
+			if (makeTimingCalibrationStuff)
 			{
-				updateTwoPixelClusterCOGwithEneg(AM2do,CoGx/totAmp,CoGy/totAmp,buffClusterXarr[0],buffClusterYarr[0],buffClusterXarr[1],buffClusterYarr[1],xcen,ycen);
-				stat = 1;
-				if (buffClusterXarr[0] == buffClusterXarr[1] || buffClusterYarr[0] == buffClusterYarr[1]) stat = 0;
-			}
-			buffClusterIsSplitloc.push_back(stat);
-			if (eventDisplayFlag) imageC[AM2do]->Fill(xcen,ycen);
-			if (makeRawTimingStuff || makeTimingCalibrationStuff)
-			{
+				if (nTrigsInCluster <= 2) clusterZfromAnodeTiming[AM2do]->Fill(meanT/factor2ConvertAnodeTime2Distance[AM2do]);
+				Int_t stat = 0;
+				if (nTrigsInCluster == 2 && applyMaxDtCut4Clustering)
+					if (TMath::Abs(buffClusterAnodeTimearr[0] - buffClusterAnodeTimearr[1]) > maxDtBetweenPixel4Clustering) stat = 1;
+				buffClusterIsSplitloc.push_back(stat);
 				if (nTrigsInCluster >= 2)
 				{
 					Int_t t1[2] = {0};
@@ -2989,24 +3698,13 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 						{
 							t1b[0] = buffClusterAnodeTimearr[it];
 							t1b[1] = buffClusterAnodeTimearr[it2];
-							if (makeRawTimingStuff) rawTimingDiffAllClusters[AM2do]->Fill(TMath::Abs(buffClusterTimearr[it]-buffClusterTimearr[it2]));
 							if (makeTimingCalibrationStuff) anodeTimingDiffAllClusters[AM2do]->Fill(TMath::Abs(t1b[0]-t1b[1]));
-							if (nTrigsInCluster > 2)
-							{
-								if (makeRawTimingStuff) rawTimingDiff3PixClusters[AM2do]->Fill(TMath::Abs(buffClusterTimearr[it]-buffClusterTimearr[it2]));
-								if (makeTimingCalibrationStuff)
-								{
-									anodeTimingDiff3PixClusters[AM2do]->Fill(TMath::Abs(t1b[0]-t1b[1]));
-									anodeTiming3PixClustersCorr[AM2do]->Fill(t1b[0],t1b[1]);
-								}
-							}
 							if (nTrigsInCluster == 2 && buffClusterTrigsarr[it] == 1 && buffClusterTrigsarr[it2] == 1) 
 							{
 								t1[0] = buffClusterTimearr[it];
 								t1[1] = buffClusterTimearr[it2];
 								t1a[0] = t1b[0];
 								t1a[1] = t1b[1];
-								if (makeRawTimingStuff) rawTimingDiff2PixClusters[AM2do]->Fill(TMath::Abs(buffClusterTimearr[it]-buffClusterTimearr[it2]));
 								if (makeTimingCalibrationStuff)
 								{
 									anodeTimingDiff2PixClusters[AM2do]->Fill(TMath::Abs(t1b[0]-t1b[1]));
@@ -3016,7 +3714,6 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 								{
 									if (!doNotUseCornerPixelsInPixelClusterCOGEneg)
 									{
-										if (makeRawTimingStuff) rawTimingDiff2PixDiagClusters[AM2do]->Fill(TMath::Abs(buffClusterTimearr[it]-buffClusterTimearr[it2]));
 										if (makeTimingCalibrationStuff)	
 										{
 											anodeTimingDiff2PixDiagClusters[AM2do]->Fill(TMath::Abs(t1a[0]-t1a[1]));
@@ -3027,36 +3724,73 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 							}
 						}
 					}
-					if (t1[0] > 0 && t1[1] > 0)
-					{
-						if (makeRawTimingStuff) rawTimingTwoPixelClustersCorr[AM2do]->Fill(t1[0],t1[1]);
-						if (makeTimingCalibrationStuff) anodeTimingTwoPixelClustersCorr[AM2do]->Fill(t1a[0],t1a[1]);
-					}
 				}
 			}
 			buffClusterXloc.push_back(xcen);
 			buffClusterYloc.push_back(ycen);
 			buffClusterEloc.push_back(totAmp);
+			buffClusterEorigloc.push_back(totAmp);
 			buffClusterArealoc.push_back(area);
 			if (isPrimaryCluster) buffClusterFlagloc.push_back(1);
 			else buffClusterFlagloc.push_back(0);
 			buffClusterTrigsloc.push_back(nTrigsInCluster);
 			buffClusterAnodeTimingloc.push_back(meanT);
+			buffClusterOrientationloc.push_back(orient);
 		}
 	}
 	if (clusterCounter > 0)
 	{
+		numberOfClusters[AM2do]->Fill(clusterCounter);
+		Bool_t clusterSizesGood = kTRUE;
+		Bool_t hasSplitClisters = kFALSE;
+		Float_t maxE = -9999;
+		Int_t maxEidx = -1;
+		for (Int_t ic = 0; ic < clusterCounter; ic++)
+		{
+			if (buffClusterEloc[ic] > maxE)
+			{
+				maxE = buffClusterEloc[ic];
+				maxEidx = ic;
+			}
+			clusterE_vsSize[AM2do]->Fill(buffClusterEloc[ic],buffClusterArealoc[ic]);
+			clusterSize[AM2do]->Fill(buffClusterArealoc[ic]);
+			clusterSize_nClusters[AM2do]->Fill(buffClusterArealoc[ic],clusterCounter);
+			if (buffClusterArealoc[ic] < minClusterSize4PairAnalysis || buffClusterArealoc[ic] > maxClusterSize4PairAnalysis) clusterSizesGood = kFALSE;
+			if (applyMaxDtCut4Clustering && buffClusterArealoc[ic] == 2)
+				if (buffClusterIsSplitloc[ic] == 1) hasSplitClisters = kTRUE;
+		}
+		clusterMaxE_vsSize[AM2do]->Fill(maxE,buffClusterArealoc[maxEidx]);
+		if (minClusterSize4PairAnalysis == -1 || maxClusterSize4PairAnalysis == -1) clusterSizesGood = kTRUE;
+		Bool_t goodNClusters = kTRUE;
+		if(clusterCounter < minNClusters4PairAnalysis || clusterCounter > maxNClusters4PairAnalysis) goodNClusters = kFALSE;
+		if (minNClusters4PairAnalysis < 0 || maxNClusters4PairAnalysis < 0) goodNClusters = kTRUE;
+		
+		if (clusterCounter == 2)
+		{
+			clusterSize2ClusterEventsCorr[AM2do]->Fill(buffClusterArealoc[0],buffClusterArealoc[1]);
+			clusterSpec2ClusterEventsCorr[AM2do]->Fill(buffClusterEloc[0],buffClusterEloc[1]);
+		}
+		if (clusterCounter == 1) clusterSpec_1ClusterEvents[AM2do]->Fill(buffClusterEloc[0]);
+		if ((clusterCounter == 1 || (clusterCounter == 2 && !hasSplitClisters)) && clusterSizesGood)
+		{
+			updateClustersWithNeighboursEnergy(AM2do,evt);
+		}
+		if (clusterCounter == 1) clusterSpec_1ClusterEvents_summed[AM2do]->Fill(buffClusterEloc[0]);
+		if (!clusterSizesGood || !goodNClusters || hasSplitClisters) return kFALSE;
 		Int_t niter = 0;
 		while (niter < buffClusterXloc.size())
 		{
 			Float_t maxE = -9999;
-			Int_t idx = -1, maxArea, maxFlag, maxTrigs, maxIsSplit;
+			Float_t maxEorig = -9999;
+			Int_t idx = -1, maxArea, maxFlag, maxTrigs, maxIsSplit, maxO;
 			Float_t maxX, maxY, maxT;
 			for (Int_t ic = niter; ic < buffClusterXloc.size(); ic++)
 			{
+				if (eventDisplayFlag && niter == 0) imageC[AM2do]->Fill(buffClusterXloc[ic],buffClusterYloc[ic]);
 				if (buffClusterEloc[ic] > maxE)
 				{
 					maxE = buffClusterEloc[ic];
+					maxEorig = buffClusterEorigloc[ic];
 					idx = ic;
 					maxX = buffClusterXloc[ic];
 					maxY = buffClusterYloc[ic];
@@ -3065,9 +3799,11 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 					maxTrigs = buffClusterTrigsloc[ic];
 					maxIsSplit = buffClusterIsSplitloc[ic];
 					maxT = buffClusterAnodeTimingloc[ic];
+					maxO = buffClusterOrientationloc[ic];
 				}
 			}
 			buffClusterEloc.erase(buffClusterEloc.begin()+idx);
+			buffClusterEorigloc.erase(buffClusterEorigloc.begin()+idx);
 			buffClusterXloc.erase(buffClusterXloc.begin()+idx);
 			buffClusterYloc.erase(buffClusterYloc.begin()+idx);
 			buffClusterArealoc.erase(buffClusterArealoc.begin()+idx);
@@ -3075,7 +3811,9 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 			buffClusterTrigsloc.erase(buffClusterTrigsloc.begin()+idx);
 			buffClusterIsSplitloc.erase(buffClusterIsSplitloc.begin()+idx);
 			buffClusterAnodeTimingloc.erase(buffClusterAnodeTimingloc.begin()+idx);
+			buffClusterOrientationloc.erase(buffClusterOrientationloc.begin()+idx);
 			buffClusterEloc.insert(buffClusterEloc.begin()+niter,maxE);
+			buffClusterEorigloc.insert(buffClusterEorigloc.begin()+niter,maxEorig);
 			buffClusterXloc.insert(buffClusterXloc.begin()+niter,maxX);
 			buffClusterYloc.insert(buffClusterYloc.begin()+niter,maxY);
 			buffClusterArealoc.insert(buffClusterArealoc.begin()+niter,maxArea);
@@ -3083,19 +3821,22 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 			buffClusterTrigsloc.insert(buffClusterTrigsloc.begin()+niter,maxTrigs);
 			buffClusterIsSplitloc.insert(buffClusterIsSplitloc.begin()+niter,maxIsSplit);
 			buffClusterAnodeTimingloc.insert(buffClusterAnodeTimingloc.begin()+niter,maxT);
+			buffClusterOrientationloc.insert(buffClusterOrientationloc.begin()+niter,maxO);
 			niter++;
 		}
-		nTrigsInEvent_maxEcluster[AM2do]->Fill(buffClusterEloc[0],nTrigPixels[AM2do]);
 		nTrigsInEvent[AM2do]->Fill(nTrigPixels[AM2do]);
 		buffClusterX.push_back(buffClusterXloc);
 		buffClusterY.push_back(buffClusterYloc);
 		buffClusterE.push_back(buffClusterEloc);
+		buffClusterEorig.push_back(buffClusterEorigloc);
 		buffClusterArea.push_back(buffClusterArealoc);
 		buffClusterFlag.push_back(buffClusterFlagloc);
 		buffClusterTrigs.push_back(buffClusterTrigsloc);
 		buffClusterIsSplit.push_back(buffClusterIsSplitloc);
 		buffClusterAnodeTiming.push_back(buffClusterAnodeTimingloc);
+		buffClusterOrientation.push_back(buffClusterOrientationloc);
 	}
+	else status = kFALSE;
 	//cout << "=============End=============" << endl;
 	return status;
 }
@@ -3217,6 +3958,12 @@ Bool_t readAnalysisSetupFile(TString fname)
 			sline.ReplaceAll("lastPixel =","");
 			lastPixel = sline.Atoi();
 			if (printOutSetupFileParameters) cout << "lastPixel = " << lastPixel << endl;
+		}
+		if (sline.Contains("pixelPitch ="))
+		{
+			sline.ReplaceAll("pixelPitch =","");
+			pixelPitch = sline.Atof();
+			if (printOutSetupFileParameters) cout << "pixelPitch = " << pixelPitch << endl;
 		}
 		if (sline.Contains("nPixXY ="))
 		{
@@ -3343,6 +4090,20 @@ Bool_t readAnalysisSetupFile(TString fname)
 			if (printOutSetupFileParameters) cout << "Na22Energy = " << Na22Energy << endl;
 		}
 		
+		if (sline.Contains("XRF_Cd ="))
+		{
+			sline.ReplaceAll("XRF_Cd =","");
+			XRF_Cd = sline.Atof();
+			if (printOutSetupFileParameters) cout << "XRF_Cd = " << XRF_Cd << endl;
+		}
+		
+		if (sline.Contains("XRF_Te ="))
+		{
+			sline.ReplaceAll("XRF_Te =","");
+			XRF_Te = sline.Atof();
+			if (printOutSetupFileParameters) cout << "XRF_Te = " << XRF_Te << endl;
+		}
+		
 		if (sline.Contains("angleOfSecondHead ="))
 		{
 			sline.ReplaceAll("angleOfSecondHead =","");
@@ -3357,32 +4118,46 @@ Bool_t readAnalysisSetupFile(TString fname)
 			if (printOutSetupFileParameters) cout << "relativePhiAngle = " << relativePhiAngle << endl;
 		}
 		
-		if (sline.Contains("EwindowFor4PhiAnalyis_min ="))
+		if (sline.Contains("Ewindow4PhiAnalyis_min ="))
 		{
-			sline.ReplaceAll("EwindowFor4PhiAnalyis_min =","");
-			EwindowFor4PhiAnalyis_min = sline.Atof();
-			if (printOutSetupFileParameters) cout << "EwindowFor4PhiAnalyis_min = " << EwindowFor4PhiAnalyis_min << endl;
+			sline.ReplaceAll("Ewindow4PhiAnalyis_min =","");
+			Ewindow4PhiAnalyis_min = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Ewindow4PhiAnalyis_min = " << Ewindow4PhiAnalyis_min << endl;
 		}
 		
-		if (sline.Contains("EwindowFor4PhiAnalyis_max ="))
+		if (sline.Contains("Ewindow4PhiAnalyis_max ="))
 		{
-			sline.ReplaceAll("EwindowFor4PhiAnalyis_max =","");
-			EwindowFor4PhiAnalyis_max = sline.Atof();
-			if (printOutSetupFileParameters) cout << "EwindowFor4PhiAnalyis_max = " << EwindowFor4PhiAnalyis_max << endl;
+			sline.ReplaceAll("Ewindow4PhiAnalyis_max =","");
+			Ewindow4PhiAnalyis_max = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Ewindow4PhiAnalyis_max = " << Ewindow4PhiAnalyis_max << endl;
 		}
 		
-		if (sline.Contains("ThetaWindowFor4PhiAnalyis_min ="))
+		if (sline.Contains("Theta1WindowFor4PhiAnalyis_min ="))
 		{
-			sline.ReplaceAll("ThetaWindowFor4PhiAnalyis_min =","");
-			ThetaWindowFor4PhiAnalyis_min = sline.Atof();
-			if (printOutSetupFileParameters) cout << "ThetaWindowFor4PhiAnalyis_min = " << ThetaWindowFor4PhiAnalyis_min << endl;
+			sline.ReplaceAll("Theta1WindowFor4PhiAnalyis_min =","");
+			Theta1WindowFor4PhiAnalyis_min = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Theta1WindowFor4PhiAnalyis_min = " << Theta1WindowFor4PhiAnalyis_min << endl;
 		}
 		
-		if (sline.Contains("ThetaWindowFor4PhiAnalyis_max ="))
+		if (sline.Contains("Theta1WindowFor4PhiAnalyis_max ="))
 		{
-			sline.ReplaceAll("ThetaWindowFor4PhiAnalyis_max =","");
-			ThetaWindowFor4PhiAnalyis_max = sline.Atof();
-			if (printOutSetupFileParameters) cout << "ThetaWindowFor4PhiAnalyis_max = " << ThetaWindowFor4PhiAnalyis_max << endl;
+			sline.ReplaceAll("Theta1WindowFor4PhiAnalyis_max =","");
+			Theta1WindowFor4PhiAnalyis_max = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Theta1WindowFor4PhiAnalyis_max = " << Theta1WindowFor4PhiAnalyis_max << endl;
+		}
+		
+		if (sline.Contains("Theta2WindowFor4PhiAnalyis_min ="))
+		{
+			sline.ReplaceAll("Theta2WindowFor4PhiAnalyis_min =","");
+			Theta2WindowFor4PhiAnalyis_min = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Theta2WindowFor4PhiAnalyis_min = " << Theta2WindowFor4PhiAnalyis_min << endl;
+		}
+		
+		if (sline.Contains("Theta2WindowFor4PhiAnalyis_max ="))
+		{
+			sline.ReplaceAll("Theta2WindowFor4PhiAnalyis_max =","");
+			Theta2WindowFor4PhiAnalyis_max = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Theta2WindowFor4PhiAnalyis_max = " << Theta2WindowFor4PhiAnalyis_max << endl;
 		}
 		
 		if (sline.Contains("nBins_dPhi ="))
@@ -3474,16 +4249,7 @@ Bool_t readAnalysisSetupFile(TString fname)
 			if (buf == 0) makeTimingCalibrationStuff = kFALSE;
 			if (printOutSetupFileParameters) cout << "makeTimingCalibrationStuff = " << makeTimingCalibrationStuff << endl;
 		}
-		
-		if (sline.Contains("makeRawTimingStuff ="))
-		{
-			sline.ReplaceAll("makeRawTimingStuff =","");
-			buf = sline.Atoi();
-			makeRawTimingStuff = kTRUE;
-			if (buf == 0) makeRawTimingStuff = kFALSE;
-			if (printOutSetupFileParameters) cout << "makeRawTimingStuff = " << makeRawTimingStuff << endl;
-		}
-		
+				
 		if (sline.Contains("typeOfPixelsToUse ="))
 		{
 			sline.ReplaceAll("typeOfPixelsToUse =","");
@@ -3512,6 +4278,15 @@ Bool_t readAnalysisSetupFile(TString fname)
 			useOnlyTriggeredPixelsInCluster = kTRUE;
 			if (buf == 0) useOnlyTriggeredPixelsInCluster = kFALSE;
 			if (printOutSetupFileParameters) cout << "useOnlyTriggeredPixelsInCluster = " << useOnlyTriggeredPixelsInCluster << endl;
+		}
+		
+		if (sline.Contains("doNotUseCornerTouchingTriggeredPixels4Clustering ="))
+		{
+			sline.ReplaceAll("doNotUseCornerTouchingTriggeredPixels4Clustering =","");
+			buf = sline.Atoi();
+			doNotUseCornerTouchingTriggeredPixels4Clustering = kTRUE;
+			if (buf == 0) doNotUseCornerTouchingTriggeredPixels4Clustering = kFALSE;
+			if (printOutSetupFileParameters) cout << "doNotUseCornerTouchingTriggeredPixels4Clustering = " << doNotUseCornerTouchingTriggeredPixels4Clustering << endl;
 		}
 		
 		if (sline.Contains("doNotUseCornerTouchingPixels4Clustering ="))
@@ -3544,75 +4319,6 @@ Bool_t readAnalysisSetupFile(TString fname)
 			sline.ReplaceAll("maxClusterSize4PairAnalysis =","");
 			maxClusterSize4PairAnalysis = sline.Atoi();
 			if (printOutSetupFileParameters) cout << "maxClusterSize4PairAnalysis = " << maxClusterSize4PairAnalysis << endl;
-		}
-		
-		if (sline.Contains("updateSinglePixelClusterCOGEneg ="))
-		{
-			sline.ReplaceAll("updateSinglePixelClusterCOGEneg =","");
-			buf = sline.Atoi();
-			updateSinglePixelClusterCOGEneg = kTRUE;
-			if (buf == 0) updateSinglePixelClusterCOGEneg = kFALSE;
-			if (printOutSetupFileParameters) cout << "updateSinglePixelClusterCOGEneg = " << updateSinglePixelClusterCOGEneg << endl;
-		}
-		
-		if (sline.Contains("updateTwoPixelClusterCOGEneg ="))
-		{
-			sline.ReplaceAll("updateTwoPixelClusterCOGEneg =","");
-			buf = sline.Atoi();
-			updateTwoPixelClusterCOGEneg = kTRUE;
-			if (buf == 0) updateTwoPixelClusterCOGEneg = kFALSE;
-			if (printOutSetupFileParameters) cout << "updateTwoPixelClusterCOGEneg = " << updateTwoPixelClusterCOGEneg << endl;
-		}
-		
-		if (sline.Contains("updateTwoPixelClusterCOG_1Donly ="))
-		{
-			sline.ReplaceAll("updateTwoPixelClusterCOG_1Donly =","");
-			buf = sline.Atoi();
-			updateTwoPixelClusterCOG_1Donly = kTRUE;
-			if (buf == 0) updateTwoPixelClusterCOG_1Donly = kFALSE;
-			if (printOutSetupFileParameters) cout << "updateTwoPixelClusterCOG_1Donly = " << updateTwoPixelClusterCOG_1Donly << endl;
-		}
-		
-		if (sline.Contains("minRawTiming4H ="))
-		{
-			sline.ReplaceAll("minRawTiming4H =","");
-			minRawTiming4H = sline.Atoi();
-			if (printOutSetupFileParameters) cout << "minRawTiming4H = " << minRawTiming4H << endl;
-		}
-
-		if (sline.Contains("maxRawTiming4H ="))
-		{
-			sline.ReplaceAll("maxRawTiming4H =","");
-			maxRawTiming4H = sline.Atoi();
-			if (printOutSetupFileParameters) cout << "maxRawTiming4H = " << maxRawTiming4H << endl;
-		}
-
-		if (sline.Contains("nBinsRawTiming4H ="))
-		{
-			sline.ReplaceAll("nBinsRawTiming4H =","");
-			nBinsRawTiming4H = sline.Atoi();
-			if (printOutSetupFileParameters) cout << "nBinsRawTiming4H = " << nBinsRawTiming4H << endl;
-		}
-		
-		if (sline.Contains("minDeltaRawTiming4H ="))
-		{
-			sline.ReplaceAll("minDeltaRawTiming4H =","");
-			minDeltaRawTiming4H = sline.Atoi();
-			if (printOutSetupFileParameters) cout << "minDeltaRawTiming4H = " << minDeltaRawTiming4H << endl;
-		}
-
-		if (sline.Contains("maxDeltaRawTiming4H ="))
-		{
-			sline.ReplaceAll("maxDeltaRawTiming4H =","");
-			maxDeltaRawTiming4H = sline.Atoi();
-			if (printOutSetupFileParameters) cout << "maxDeltaRawTiming4H = " << maxDeltaRawTiming4H << endl;
-		}
-
-		if (sline.Contains("nBinsDeltaRawTiming4H ="))
-		{
-			sline.ReplaceAll("nBinsDeltaRawTiming4H =","");
-			nBinsDeltaRawTiming4H = sline.Atoi();
-			if (printOutSetupFileParameters) cout << "nBinsDeltaRawTiming4H = " << nBinsDeltaRawTiming4H << endl;
 		}
 		
 		if (sline.Contains("minAnodeTiming4H ="))
@@ -3723,9 +4429,133 @@ Bool_t readAnalysisSetupFile(TString fname)
 		
 		if (sline.Contains("factor2ConvertAnodeTime2Distance ="))
 		{
+			factor2ConvertAnodeTime2Distance = new Float_t[nAMs];
 			sline.ReplaceAll("factor2ConvertAnodeTime2Distance =","");
-			factor2ConvertAnodeTime2Distance = sline.Atof();
-			if (printOutSetupFileParameters) cout << "factor2ConvertAnodeTime2Distance = " << factor2ConvertAnodeTime2Distance << endl;
+			TObjArray *tt = sline.Tokenize(" ");
+			for (Int_t ii = 0; ii < nAMs; ii++)
+			{
+				factor2ConvertAnodeTime2Distance[ii] = (((TObjString *) (tt->At(ii)))->String()).Atof();
+				if (printOutSetupFileParameters) cout << "factor2ConvertAnodeTime2Distance[" << ii << "] = " << factor2ConvertAnodeTime2Distance[ii] << endl;
+			}
+		}
+		
+		if (sline.Contains("minZ ="))
+		{
+			sline.ReplaceAll("minZ =","");
+			minZ = sline.Atof();
+			if (printOutSetupFileParameters) cout << "minZ = " << minZ << endl;
+		}
+		
+		if (sline.Contains("maxZ ="))
+		{
+			sline.ReplaceAll("maxZ =","");
+			maxZ = sline.Atof();
+			if (printOutSetupFileParameters) cout << "maxZ = " << maxZ << endl;
+		}
+		
+		if (sline.Contains("nBinsZ ="))
+		{
+			sline.ReplaceAll("nBinsZ =","");
+			nBinsZ = sline.Atoi();
+			if (printOutSetupFileParameters) cout << "nBinsZ = " << nBinsZ << endl;
+		}
+		
+		if (sline.Contains("maxCathodeEnergy ="))
+		{
+			sline.ReplaceAll("maxCathodeEnergy =","");
+			maxCathodeEnergy = sline.Atof();
+			if (printOutSetupFileParameters) cout << "maxCathodeEnergy = " << maxCathodeEnergy << endl;
+		}
+		
+		if (sline.Contains("eventHasToHaveCathodeSignal ="))
+		{
+			sline.ReplaceAll("eventHasToHaveCathodeSignal =","");
+			buf = sline.Atoi();
+			eventHasToHaveCathodeSignal = kTRUE;
+			if (buf == 0) eventHasToHaveCathodeSignal = kFALSE;
+			if (printOutSetupFileParameters) cout << "eventHasToHaveCathodeSignal = " << eventHasToHaveCathodeSignal << endl;
+		}
+		
+		if (sline.Contains("makeAsymmetricThetaWindow ="))
+		{
+			sline.ReplaceAll("makeAsymmetricThetaWindow =","");
+			buf = sline.Atoi();
+			makeAsymmetricThetaWindow = kTRUE;
+			if (buf == 0) makeAsymmetricThetaWindow = kFALSE;
+			if (printOutSetupFileParameters) cout << "makeAsymmetricThetaWindow = " << makeAsymmetricThetaWindow << endl;
+		}
+		
+		if (sline.Contains("enableUpdateEnergyClusters ="))
+		{
+			sline.ReplaceAll("enableUpdateEnergyClusters =","");
+			buf = sline.Atoi();
+			enableUpdateEnergyClusters = kTRUE;
+			if (buf == 0) enableUpdateEnergyClusters = kFALSE;
+			if (printOutSetupFileParameters) cout << "enableUpdateEnergyClusters = " << enableUpdateEnergyClusters << endl;
+		}
+		
+		if (sline.Contains("maxDtBetweenSinglePixClusters4updatingEnergy_low ="))
+		{
+			sline.ReplaceAll("maxDtBetweenSinglePixClusters4updatingEnergy_low =","");
+			maxDtBetweenSinglePixClusters4updatingEnergy_low = sline.Atof();
+			if (printOutSetupFileParameters) cout << "maxDtBetweenSinglePixClusters4updatingEnergy_low = " << maxDtBetweenSinglePixClusters4updatingEnergy_low << endl;
+		}
+		
+		if (sline.Contains("maxDtBetweenSinglePixClusters4updatingEnergy_up ="))
+		{
+			sline.ReplaceAll("maxDtBetweenSinglePixClusters4updatingEnergy_up =","");
+			maxDtBetweenSinglePixClusters4updatingEnergy_up = sline.Atof();
+			if (printOutSetupFileParameters) cout << "maxDtBetweenSinglePixClusters4updatingEnergy_up = " << maxDtBetweenSinglePixClusters4updatingEnergy_up << endl;
+		}
+		
+		if (sline.Contains("maxDtBetweenTwoPixClusters4updatingEnergy_low ="))
+		{
+			sline.ReplaceAll("maxDtBetweenTwoPixClusters4updatingEnergy_low =","");
+			maxDtBetweenTwoPixClusters4updatingEnergy_low = sline.Atof();
+			if (printOutSetupFileParameters) cout << "maxDtBetweenTwoPixClusters4updatingEnergy_low = " << maxDtBetweenTwoPixClusters4updatingEnergy_low << endl;
+		}
+		
+		if (sline.Contains("maxDtBetweenTwoPixClusters4updatingEnergy_up ="))
+		{
+			sline.ReplaceAll("maxDtBetweenTwoPixClusters4updatingEnergy_up =","");
+			maxDtBetweenTwoPixClusters4updatingEnergy_up = sline.Atof();
+			if (printOutSetupFileParameters) cout << "maxDtBetweenTwoPixClusters4updatingEnergy_up = " << maxDtBetweenTwoPixClusters4updatingEnergy_up << endl;
+		}
+		
+		if (sline.Contains("updateSinglePixelClusterCOG ="))
+		{
+			sline.ReplaceAll("updateSinglePixelClusterCOG =","");
+			buf = sline.Atoi();
+			updateSinglePixelClusterCOG = kTRUE;
+			if (buf == 0) updateSinglePixelClusterCOG = kFALSE;
+			if (printOutSetupFileParameters) cout << "updateSinglePixelClusterCOG = " << updateSinglePixelClusterCOG << endl;
+		}
+		
+		if (sline.Contains("updateTwoPixelClusterCOG ="))
+		{
+			sline.ReplaceAll("updateTwoPixelClusterCOG =","");
+			buf = sline.Atoi();
+			updateTwoPixelClusterCOG = kTRUE;
+			if (buf == 0) updateTwoPixelClusterCOG = kFALSE;
+			if (printOutSetupFileParameters) cout << "updateTwoPixelClusterCOG = " << updateTwoPixelClusterCOG << endl;
+		}
+		
+		if (sline.Contains("updateTwoPixelClusterCOGshort_1D ="))
+		{
+			sline.ReplaceAll("updateTwoPixelClusterCOGshort_1D =","");
+			buf = sline.Atoi();
+			updateTwoPixelClusterCOGshort_1D = kTRUE;
+			if (buf == 0) updateTwoPixelClusterCOGshort_1D = kFALSE;
+			if (printOutSetupFileParameters) cout << "updateTwoPixelClusterCOGshort_1D = " << updateTwoPixelClusterCOGshort_1D << endl;
+		}
+		
+		if (sline.Contains("updateTwoPixelClusterCOGlong_1D ="))
+		{
+			sline.ReplaceAll("updateTwoPixelClusterCOGlong_1D =","");
+			buf = sline.Atoi();
+			updateTwoPixelClusterCOGlong_1D = kTRUE;
+			if (buf == 0) updateTwoPixelClusterCOGlong_1D = kFALSE;
+			if (printOutSetupFileParameters) cout << "updateTwoPixelClusterCOGlong_1D = " << updateTwoPixelClusterCOGlong_1D << endl;
 		}
 	}
 	in_file.close();
@@ -3789,8 +4619,19 @@ void getNewNeighbours(Int_t ix, Int_t iy, Int_t win)
 		for (Int_t m = iy-win; m <= iy+win; m++)
 		{
 			if (m >= lastPixel || m < 0) continue;
-			if (doNotUseCornerTouchingPixels4Clustering && (k-ix == m-iy || k-ix == iy-m)) continue;
-			if (applyMaxDtCut4Clustering && TMath::Abs(matrix_timeCalib[ix][iy] - matrix_timeCalib[k][m]) > maxDtBetweenPixel4Clustering) continue;
+			//if (matrix_trigs[k][m] == 1 && doNotUseCornerTouchingTriggeredPixels4Clustering && (k-ix == m-iy || k-ix == iy-m)) continue;
+			//if (matrix_trigs[k][m] == 0 && doNotUseCornerTouchingPixels4Clustering && (k-ix == m-iy || k-ix == iy-m)) continue;
+			//if (matrix_trigs[k][m] == 1 && doNotUseCornerTouchingTriggeredPixels4Clustering && (k-ix == m-iy || k-ix == iy-m || ix-k == iy-m || ix-k == m-iy)) continue;
+			//if (matrix_trigs[k][m] == 0 && doNotUseCornerTouchingPixels4Clustering && (k-ix == m-iy || k-ix == iy-m || ix-k == iy-m || ix-k == m-iy)) continue;
+			if (matrix_trigs[k][m] == 1 && doNotUseCornerTouchingTriggeredPixels4Clustering && k == ix-win && m == iy-win) continue;
+			if (matrix_trigs[k][m] == 1 && doNotUseCornerTouchingTriggeredPixels4Clustering && k == ix+win && m == iy+win) continue;
+			if (matrix_trigs[k][m] == 1 && doNotUseCornerTouchingTriggeredPixels4Clustering && k == ix-win && m == iy+win) continue;
+			if (matrix_trigs[k][m] == 1 && doNotUseCornerTouchingTriggeredPixels4Clustering && k == ix+win && m == iy-win) continue;
+			if (matrix_trigs[k][m] == 0 && doNotUseCornerTouchingPixels4Clustering && k == ix-win && m == iy-win) continue;
+			if (matrix_trigs[k][m] == 0 && doNotUseCornerTouchingPixels4Clustering && k == ix+win && m == iy+win) continue;
+			if (matrix_trigs[k][m] == 0 && doNotUseCornerTouchingPixels4Clustering && k == ix-win && m == iy+win) continue;
+			if (matrix_trigs[k][m] == 0 && doNotUseCornerTouchingPixels4Clustering && k == ix+win && m == iy-win) continue;
+			//if (applyMaxDtCut4Clustering && TMath::Abs(matrix_timeCalib[ix][iy] - matrix_timeCalib[k][m]) > maxDtBetweenPixel4Clustering) continue;
 			if (matrix_flags[k][m] == newNeighbourFlag)
 			{
 				buffX.push_back(k);
@@ -3837,67 +4678,6 @@ Float_t updateSinglePixelClusterCOGwithEneg(const Int_t ix, const Int_t iy, Floa
 	return tamp;
 }
 
-void updateTwoPixelClusterCOGwithEneg(const Int_t am, const Float_t ixc, const Float_t iyc, const Int_t ix1, const Int_t iy1, const Int_t ix2, const Int_t iy2, Float_t &x1, Float_t &y1)
-{
-	x1 = ixc;
-	y1 = iyc;
-	if (pixelStatusGlobal[am][ix1][iy1] < 1 && pixelStatusGlobal[am][ix2][iy2] < 1) return;
-	Float_t totNE1 = 0;
-	Float_t totNE2 = 0;
-	if (ix1 == ix2) // vertical cluster
-	{
-		if (iy1 > iy2)
-		{
-			if (!updateTwoPixelClusterCOG_1Donly && iy1 <= 20) totNE1 += matrix_Eneg[ix1-1][iy1+1];
-			totNE1 += matrix_Eneg[ix1-1][iy1];
-			totNE1 += matrix_Eneg[ix1-1][iy2];
-			if (!updateTwoPixelClusterCOG_1Donly && iy2 >= 11) totNE1 += matrix_Eneg[ix1-1][iy2-1];
-			if (!updateTwoPixelClusterCOG_1Donly && iy1 <= 20) totNE2 += matrix_Eneg[ix1+1][iy1+1];
-			totNE2 += matrix_Eneg[ix1+1][iy1];
-			totNE2 += matrix_Eneg[ix1+1][iy2];
-			if (!updateTwoPixelClusterCOG_1Donly && iy2 >= 11) totNE2 += matrix_Eneg[ix1+1][iy2-1];
-		}
-		if (iy1 < iy2)
-		{
-			if (!updateTwoPixelClusterCOG_1Donly && iy2 <= 20) totNE1 += matrix_Eneg[ix1-1][iy2+1];
-			totNE1 += matrix_Eneg[ix1-1][iy2];
-			totNE1 += matrix_Eneg[ix1-1][iy1];
-			if (!updateTwoPixelClusterCOG_1Donly && iy1 >= 11) totNE1 += matrix_Eneg[ix1-1][iy1-1];
-			if (!updateTwoPixelClusterCOG_1Donly && iy2 <= 20) totNE2 += matrix_Eneg[ix1+1][iy2+1];
-			totNE2 += matrix_Eneg[ix1+1][iy2];
-			totNE2 += matrix_Eneg[ix1+1][iy1];
-			if (!updateTwoPixelClusterCOG_1Donly && iy1 >= 11) totNE2 += matrix_Eneg[ix1+1][iy1-1];
-		}
-		x1 = (totNE1*(ix1-0.5)+totNE2*(ix1+1.5))/(totNE1+totNE2);
-	}
-	if (iy1 == iy2) // horizontal cluster
-	{
-		if (ix1 > ix2)
-		{
-			if (!updateTwoPixelClusterCOG_1Donly && ix2 >= 1) totNE1 += matrix_Eneg[ix2-1][iy1-1];
-			totNE1 += matrix_Eneg[ix2][iy1-1];
-			totNE1 += matrix_Eneg[ix1][iy1-1];
-			if (!updateTwoPixelClusterCOG_1Donly && ix1 <= 9) totNE1 += matrix_Eneg[ix1+1][iy1-1];
-			if (!updateTwoPixelClusterCOG_1Donly && ix2 >= 1) totNE2 += matrix_Eneg[ix2-1][iy1+1];
-			totNE2 += matrix_Eneg[ix2][iy1+1];
-			totNE2 += matrix_Eneg[ix1][iy1+1];
-			if (!updateTwoPixelClusterCOG_1Donly && ix1 <= 9) totNE2 += matrix_Eneg[ix1+1][iy1+1];
-		}
-		if (ix1 < ix2)
-		{
-			if (!updateTwoPixelClusterCOG_1Donly && ix1 >= 1) totNE1 += matrix_Eneg[ix1-1][iy1-1];
-			totNE1 += matrix_Eneg[ix1][iy1-1];
-			totNE1 += matrix_Eneg[ix2][iy1-1];
-			if (!updateTwoPixelClusterCOG_1Donly && ix2 <= 9) totNE1 += matrix_Eneg[ix2+1][iy1-1];
-			if (!updateTwoPixelClusterCOG_1Donly && ix1 >= 1) totNE2 += matrix_Eneg[ix1-1][iy1+1];
-			totNE2 += matrix_Eneg[ix1][iy1+1];
-			totNE2 += matrix_Eneg[ix2][iy1+1];
-			if (!updateTwoPixelClusterCOG_1Donly && ix2 <= 9) totNE2 += matrix_Eneg[ix2+1][iy1+1];
-		}
-		y1 = (totNE1*(iy1-0.5)+totNE2*(iy1+1.5))/(totNE1+totNE2);
-	}
-}
-
 Double_t fitfun(Double_t *x, Double_t *par)
 {
 	return par[0]*TMath::Cos(2*x[0]*TMath::DegToRad()-TMath::Pi())+par[1];
@@ -3905,32 +4685,178 @@ Double_t fitfun(Double_t *x, Double_t *par)
 
 void sortClusters(const Int_t am)
 {
-	firstClusterIdx[am] = 1;
-	secondClusterIdx[am] = 0;
-	if (buffClusterTrigs[am][firstClusterIdx[am]] >= 3)
+	firstClusterIdx[am] = 0;
+	secondClusterIdx[am] = 1;
+	/*
+	Float_t xx = 6;
+	Float_t yy = 17;
+	if (am == 1)
 	{
-		firstClusterIdx[am] = 0;
-		secondClusterIdx[am] = 1;
+		xx = 4;
+		yy = 16;
 	}
-	if (buffClusterIsSplit[am][firstClusterIdx[am]] == 1 && buffClusterIsSplit[am][secondClusterIdx[am]] == 0)
+	Float_t dist1 = TMath::Hypot(buffClusterX[am][0]-xx,buffClusterY[am][0]-yy);
+	Float_t dist2 = TMath::Hypot(buffClusterX[am][1]-xx,buffClusterY[am][1]-yy);
+	if (dist1 > dist2)
 	{
-		firstClusterIdx[am] = 0;
-		secondClusterIdx[am] = 1;
+		firstClusterIdx[am] = 1;
+		secondClusterIdx[am] = 0;
 	}
-	if (buffClusterX[am].size() > 2)
+	*/
+}
+
+void updateClustersWithNeighboursEnergy(const Int_t am, const Int_t eve2)
+{
+	Int_t vsize = buff_E_neighb_4sum.size();
+	Int_t *idx = new Int_t[vsize];
+	Float_t *arr = new Float_t[vsize];
+	for (Int_t ia = 0; ia < vsize; ia++) arr[ia] = buff_E_neighb_4sum[ia];
+	TMath::Sort(vsize,arr,idx,1);
+	Float_t x2new[2] = {0}, y2new[2] = {0}, totE2pix[2] = {0};
+	Int_t idx_2pix[2] = {-1,-1};
+	Bool_t COGupdated = kFALSE;
+	Int_t nbAdded[2] = {0,0};
+	
+	for (Int_t ia = 0; ia < vsize; ia++) 
 	{
-		firstClusterIdx[am] = 0;
-		Float_t minDist = -9999;
-		Int_t idx = -1;
-		for (Int_t p = 1; p < buffClusterX[am].size(); p++)
+		Int_t ix = buff_X_neighb_4sum[idx[ia]];
+		Int_t iy = buff_Y_neighb_4sum[idx[ia]];
+		Float_t minDTime = 9999;
+		Int_t minDTime_x = -1;
+		Int_t minDTime_y = -1;
+		Float_t maxEn = -9999;
+		for (Int_t k = ix-1; k <= ix+1; k++)
 		{
-			Float_t dist = TMath::Hypot(buffClusterX[am][0]-buffClusterX[am][p],buffClusterY[am][0]-buffClusterY[am][p]);
-			if (dist > minDist)
+			if (k < 0) continue;
+			if (k > 10) continue;
+			if (ix == 0 && k == 1) continue;
+			if (ix == 10 && k == 9) continue;
+			for (Int_t m = iy-1; m <= iy+1; m++)
 			{
-				minDist = dist;
-				idx = p;
+				if (m < 11) continue;
+				if (m > 21) continue;
+				if (iy == 11 && m == 12) continue;
+				if (iy == 21 && m == 20) continue;
+				if (k == ix && m == iy) continue;
+				if (matrix_trigs_4sum[k][m] < 1) continue;
+				Float_t dist = TMath::Abs(matrix_timeCalib[ix][iy]-matrix_timeCalib[k][m]);
+				if (dist < minDTime)
+				{
+					minDTime = dist;
+					minDTime_x = k;
+					minDTime_y = m;
+					maxEn = arr[idx[ia]];
+				}
 			}
 		}
-		secondClusterIdx[am] = idx;
+		if (maxEn > minPixelEnergyThr4ClusterReconstruction)
+		{
+			Int_t clusterN = matrix_trigs_4sum[minDTime_x][minDTime_y]-1;
+			Float_t dt = matrix_timeCalib[ix][iy]-matrix_timeCalib[minDTime_x][minDTime_y];
+			Bool_t isGood = kFALSE;
+			if (buffClusterArealoc[clusterN] == 1 && enableUpdateEnergyClusters)
+			{	
+				if (dt < 0 && -dt < maxDtBetweenSinglePixClusters4updatingEnergy_up) isGood = kTRUE;
+				if (dt >= 0 && dt < maxDtBetweenSinglePixClusters4updatingEnergy_low) isGood = kTRUE;
+				pixelSpecNeighbour1PixClusters[am]->Fill(maxEn);
+				energySpecCorr1PixClusters[am]->Fill(buffClusterEloc[clusterN],maxEn);
+				anodeTiming1PixelClustersNeigbCorr[am]->Fill(matrix_timeCalib[minDTime_x][minDTime_y],matrix_timeCalib[ix][iy]);				
+				dAnodeTiming_vs_nE_1PixelClustersNeigb[am]->Fill(maxEn,matrix_timeCalib[minDTime_x][minDTime_y]-matrix_timeCalib[ix][iy]);
+				dAnodeTiming_vs_sumE_1PixelClustersNeigb[am]->Fill(buffClusterEloc[clusterN]+maxEn,matrix_timeCalib[minDTime_x][minDTime_y]-matrix_timeCalib[ix][iy]);
+				dAnodeTiming_vs_NeigbAnodeTiming_1PixelClusters[am]->Fill(matrix_timeCalib[ix][iy],matrix_timeCalib[minDTime_x][minDTime_y]-matrix_timeCalib[ix][iy]);
+				anodeTimingNeigb_nE_1PixelClusters[am]->Fill(maxEn,matrix_timeCalib[ix][iy]);
+				if (updateSinglePixelClusterCOG)
+				{
+					Float_t x1new = (minDTime_x+0.5)*buffClusterEloc[clusterN];
+					Float_t y1new = (minDTime_y+0.5)*buffClusterEloc[clusterN];
+					x1new += (ix+0.5)*maxEn;
+					y1new += (iy+0.5)*maxEn;
+					buffClusterXloc[clusterN] = x1new/(buffClusterEloc[clusterN]+maxEn);
+					buffClusterYloc[clusterN] = y1new/(buffClusterEloc[clusterN]+maxEn);
+				}
+				if (isGood) nbAdded[clusterN]++;
+			}
+			if (buffClusterArealoc[clusterN] == 2 && enableUpdateEnergyClusters)
+			{
+				if (dt < 0 && -dt < maxDtBetweenTwoPixClusters4updatingEnergy_up) isGood = kTRUE;
+				if (dt >= 0 && dt < maxDtBetweenTwoPixClusters4updatingEnergy_low) isGood = kTRUE;
+				anodeTiming2PixelClustersNeigbCorr[am]->Fill(matrix_timeCalib[minDTime_x][minDTime_y],matrix_timeCalib[ix][iy]);
+				anodeTimingNeigb_nE_1PixelClusters[am]->Fill(maxEn,matrix_timeCalib[ix][iy]);
+				if (updateTwoPixelClusterCOG)
+				{
+					x2new[clusterN] += (ix+0.5)*maxEn;
+					y2new[clusterN] += (iy+0.5)*maxEn;
+					COGupdated = kTRUE;
+					totE2pix[clusterN] += maxEn;
+				}
+				if (updateTwoPixelClusterCOGshort_1D)
+				{
+					if (buffClusterOrientationloc[clusterN] == 0)
+					{
+						y2new[clusterN] += (iy+0.5)*maxEn;
+						COGupdated = kTRUE;
+					}
+					if (buffClusterOrientationloc[clusterN] == 1)
+					{
+						x2new[clusterN] += (ix+0.5)*maxEn;
+						COGupdated = kTRUE;
+					}
+				}
+				if (updateTwoPixelClusterCOGlong_1D)
+				{
+					if (buffClusterOrientationloc[clusterN] == 0)
+					{
+						x2new[clusterN] += (ix+0.5)*maxEn;
+						COGupdated = kTRUE;
+					}
+					if (buffClusterOrientationloc[clusterN] == 1)
+					{
+						y2new[clusterN] += (iy+0.5)*maxEn;
+						COGupdated = kTRUE;
+					}
+				}		
+				if (isGood) nbAdded[clusterN]++;
+			}
+			if (isGood)
+			{
+				buffClusterEloc[clusterN] += maxEn;
+				matrix_trigs_4sum[minDTime_x][minDTime_y] = 0;
+				if (buffClusterArealoc.size() == 1) clusterSpec_1ClusterEvents_summed[am]->Fill(buffClusterEloc[0]);
+				if (eventDisplayFlag) imageE[am]->SetBinContent(ix+1,iy+1,maxEn);
+			}
+		}
 	}
+	if (COGupdated)
+	{
+		for (Int_t ia = 0; ia < buffClusterEloc.size(); ia++)
+		{
+			if (buffClusterArealoc[ia] != 2) continue;
+			totE2pix[ia] += buffClusterEorigloc[ia];
+			x2new[ia] += buffClusterXloc[ia]*buffClusterEorigloc[ia];
+			y2new[ia] += buffClusterYloc[ia]*buffClusterEorigloc[ia];
+		}
+		for (Int_t ia = 0; ia < buffClusterEloc.size(); ia++)
+		{
+			if (buffClusterArealoc[ia] != 2 || TMath::Abs(totE2pix[ia]) < 1) continue;
+			buffClusterXloc[ia] = x2new[ia]/totE2pix[ia];
+			buffClusterYloc[ia] = y2new[ia]/totE2pix[ia];
+		}
+	}
+	for (Int_t ia = 0; ia < buffClusterEloc.size(); ia++)
+	{
+		if (buffClusterArealoc[ia] == 1) clusterSummingStats1PixClusters[am]->Fill(nbAdded[ia]);
+		if (buffClusterArealoc[ia] == 2) clusterSummingStats2PixClusters[am]->Fill(nbAdded[ia]);
+	}
+	
+	delete arr, idx;
+}
+
+Double_t fitMAC(Double_t *x, Double_t *par)
+{
+	return par[0]*TMath::Power(x[0]-par[1],par[2]);
+}
+
+Float_t getThetaAngleFromHitsXYt(const Int_t am, const Float_t x1, const Float_t x2, const Float_t y1, const Float_t y2, const Float_t t1, const Float_t t2)
+{
+	return TMath::ATan(TMath::Hypot(x1-x2,y1-y2)*pixelPitch/(TMath::Abs(t1-t2)/factor2ConvertAnodeTime2Distance[am]))*TMath::RadToDeg();
 }
