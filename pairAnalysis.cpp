@@ -48,7 +48,7 @@ ofstream logfile;
 
 TString pathRoot = "./";
 
-const TString ver = "v11";
+const TString ver = "dev";
 const TString setup_file = "analysis_setup_pairAnalysis_" + ver + ".txt";
 
 const TString fname = "data";
@@ -108,8 +108,13 @@ Float_t XRF_Cd = 23.17;
 Float_t XRF_Te = 27.47;
 Float_t angleOfSecondHead = 90;
 Float_t relativePhiAngle = 90;
-Float_t Ewindow4PhiAnalyis_min = 530;
-Float_t Ewindow4PhiAnalyis_max = 530;
+//Float_t E1window4PhiAnalysis_min = 530;
+//Float_t E1window4PhiAnalysis_max = 530;
+//Float_t E2window4PhiAnalysis_min = 530;
+//Float_t E2window4PhiAnalysis_max = 530;
+Float_t Ewindow4PhiAnalysis_min[2] = {530,530};
+Float_t Ewindow4PhiAnalysis_max[2] = {530,530};
+
 Float_t Theta1WindowFor4PhiAnalyis_min = 60;
 Float_t Theta1WindowFor4PhiAnalyis_max = 90;
 Float_t Theta2WindowFor4PhiAnalyis_min = 60;
@@ -1505,7 +1510,7 @@ int main()
 	dPhiXYtAngle->GetXaxis()->SetTitleOffset(1.2);
 	dPhiXYtAngle->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 
-	dPhiXYtAngle_Ewin = new TH1F("dPhiXYtAngle_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiXYtAngle_Ewin = new TH1F("dPhiXYtAngle_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi,-180,180);
 	dPhiXYtAngle_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiXYtAngle_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 
@@ -1513,7 +1518,7 @@ int main()
 	dPhiXYtAngleNorm->GetXaxis()->SetTitleOffset(1.2);
 	dPhiXYtAngleNorm->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 
-	dPhiXYtAngleNorm_Ewin = new TH1F("dPhiXYtAngleNorm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiXYtAngleNorm_Ewin = new TH1F("dPhiXYtAngleNorm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi,-180,180);
 	dPhiXYtAngleNorm_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiXYtAngleNorm_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 
@@ -1521,7 +1526,7 @@ int main()
 	dPhiXYtAngle1->GetXaxis()->SetTitleOffset(1.2);
 	dPhiXYtAngle1->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 
-	dPhiXYtAngle1_Ewin = new TH1F("dPhiXYtAngle1_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi/2,0,180);
+	dPhiXYtAngle1_Ewin = new TH1F("dPhiXYtAngle1_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi/2,0,180);
 	dPhiXYtAngle1_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiXYtAngle1_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 
@@ -1529,7 +1534,7 @@ int main()
 	dPhiXYtAngle1Norm->GetXaxis()->SetTitleOffset(1.2);
 	dPhiXYtAngle1Norm->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 
-	dPhiXYtAngle1Norm_Ewin = new TH1F("dPhiXYtAngle1Norm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi/2,0,180);
+	dPhiXYtAngle1Norm_Ewin = new TH1F("dPhiXYtAngle1Norm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0, using X-Y-t #theta window",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi/2,0,180);
 	dPhiXYtAngle1Norm_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiXYtAngle1Norm_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
@@ -1557,27 +1562,27 @@ int main()
 	dPhiAngle1norm->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle1norm->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngle_Ewin = new TH1F("dPhiAngle_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiAngle_Ewin = new TH1F("dPhiAngle_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi,-180,180);
 	dPhiAngle_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngle_Ewin_w = new TH1F("dPhiAngle_Ewin_w",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, weighted",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiAngle_Ewin_w = new TH1F("dPhiAngle_Ewin_w",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, weighted",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi,-180,180);
 	dPhiAngle_Ewin_w->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle_Ewin_w->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngleNorm_Ewin = new TH1F("dPhiAngleNorm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiAngleNorm_Ewin = new TH1F("dPhiAngleNorm_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi,-180,180);
 	dPhiAngleNorm_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngleNorm_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngleNorm_Ewin_w = new TH1F("dPhiAngleNorm_Ewin_w",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0, weighted",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi,-180,180);
+	dPhiAngleNorm_Ewin_w = new TH1F("dPhiAngleNorm_Ewin_w",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0, weighted",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi,-180,180);
 	dPhiAngleNorm_Ewin_w->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngleNorm_Ewin_w->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngle1_Ewin = new TH1F("dPhiAngle1_Ewin",Form("%s, |#Delta#varphi| within  %.0f keV < E < %.0f keV",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi/2,0,180);
+	dPhiAngle1_Ewin = new TH1F("dPhiAngle1_Ewin",Form("%s, |#Delta#varphi| within  %.0f keV < E < %.0f keV",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi/2,0,180);
 	dPhiAngle1_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle1_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
-	dPhiAngle1norm_Ewin = new TH1F("dPhiAngle1norm_Ewin",Form("%s, |#Delta#varphi| within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0",spectrumName.Data(),Ewindow4PhiAnalyis_min,Ewindow4PhiAnalyis_max),nBins_dPhi/2,0,180);
+	dPhiAngle1norm_Ewin = new TH1F("dPhiAngle1norm_Ewin",Form("%s, |#Delta#varphi| within  %.0f keV < E < %.0f keV, normalised at #Delta#varphi = 0",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi/2,0,180);
 	dPhiAngle1norm_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle1norm_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");		
 	
@@ -2216,8 +2221,8 @@ int main()
 			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSpecClusters[im]->GetName()).Data()));
 
 			comptonSummedSpec2Clusters[im]->Draw();
-			line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters[im]->GetMaximum()/3);
-			line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters[im]->GetMinimum(),Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters[im]->GetMinimum(),Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters[im]->GetMaximum()/3);
 			Y_text_top = 0.82;
 			getHistoPeak(comptonSummedSpec2Clusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
 			Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -2232,8 +2237,8 @@ int main()
 			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters[im]->GetName()).Data()));
 		
 			comptonSummedSpec2Clusters_1PixClusters[im]->Draw();
-			line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1PixClusters[im]->GetMaximum()/3);
-			line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1PixClusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_1PixClusters[im]->GetMinimum(),Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_1PixClusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_1PixClusters[im]->GetMinimum(),Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_1PixClusters[im]->GetMaximum()/3);
 			Y_text_top = 0.82;
 			getHistoPeak(comptonSummedSpec2Clusters_1PixClusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
 			Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_1PixClusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -2248,8 +2253,8 @@ int main()
 			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_1PixClusters[im]->GetName()).Data()));
 		
 			comptonSummedSpec2Clusters_2PixClusters[im]->Draw();
-			line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_2PixClusters[im]->GetMaximum()/3);
-			line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_2PixClusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_2PixClusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_2PixClusters[im]->GetMaximum()/3);
 			Y_text_top = 0.82;
 			getHistoPeak(comptonSummedSpec2Clusters_2PixClusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
 			Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_2PixClusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -2264,8 +2269,8 @@ int main()
 			c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_2PixClusters[im]->GetName()).Data()));
 		
 			comptonSummedSpec2Clusters_1_2PixClusters[im]->Draw();
-			line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMaximum()/3);
-			line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMaximum()/3);
+			line1->DrawLine(Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMinimum(),Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_1_2PixClusters[im]->GetMaximum()/3);
 			Y_text_top = 0.82;
 			getHistoPeak(comptonSummedSpec2Clusters_1_2PixClusters[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
 			Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_1_2PixClusters[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -2294,8 +2299,8 @@ int main()
 		
 		c1->cd(0);
 		comptonSummedSpec2Clusters_Eunsummed[im]->Draw();
-		line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_Eunsummed[im]->GetMaximum()/3);
-		line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_Eunsummed[im]->GetMaximum()/3);
 		Y_text_top = 0.82;
 		getHistoPeak(comptonSummedSpec2Clusters_Eunsummed[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
 		Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_Eunsummed[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -2310,8 +2315,8 @@ int main()
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_Eunsummed[im]->GetName()).Data()));
 		
 		comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->Draw();
-		line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMaximum()/3);
-		line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetMaximum()/3);
 		Y_text_top = 0.82;
 		getHistoPeak(comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
 		Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -2326,8 +2331,8 @@ int main()
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_1PixClusters_Eunsummed[im]->GetName()).Data()));
 		
 		comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->Draw();
-		line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMaximum()/3);
-		line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetMaximum()/3);
 		Y_text_top = 0.82;
 		getHistoPeak(comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
 		Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -2342,8 +2347,8 @@ int main()
 		c1->SaveAs(Form("%s/%s.gif",outputPathAM[im].Data(),TString(comptonSummedSpec2Clusters_2PixClusters_Eunsummed[im]->GetName()).Data()));
 		
 		comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->Draw();
-		line1->DrawLine(Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_min,comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMaximum()/3);
-		line1->DrawLine(Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalyis_max,comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalysis_min[im],comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMaximum()/3);
+		line1->DrawLine(Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMinimum(),Ewindow4PhiAnalysis_max[im],comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im]->GetMaximum()/3);
 		Y_text_top = 0.82;
 		getHistoPeak(comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im], minPhotopeakE4PeakSearch, maxPhotopeakE4PeakSearch, locMaxPeak, locMaxPeakHeight);
 		Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters_1_2PixClusters_Eunsummed[im], locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -2772,8 +2777,8 @@ int main()
 	c1->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(dPhiXYtAngle1Norm_Ewin->GetName()).Data()));
 	
 	comptonSummedSpec2Clusters2Heads->Draw();
-	line1->DrawLine(Ewindow4PhiAnalyis_min*2,comptonSummedSpec2Clusters2Heads->GetMinimum(),Ewindow4PhiAnalyis_min*2,comptonSummedSpec2Clusters2Heads->GetMaximum()/3);
-	line1->DrawLine(Ewindow4PhiAnalyis_max*2,comptonSummedSpec2Clusters2Heads->GetMinimum(),Ewindow4PhiAnalyis_max*2,comptonSummedSpec2Clusters2Heads->GetMaximum()/3);
+	line1->DrawLine(Ewindow4PhiAnalysis_min[0]*2,comptonSummedSpec2Clusters2Heads->GetMinimum(),Ewindow4PhiAnalysis_min[0]*2,comptonSummedSpec2Clusters2Heads->GetMaximum()/3);
+	line1->DrawLine(Ewindow4PhiAnalysis_max[0]*2,comptonSummedSpec2Clusters2Heads->GetMinimum(),Ewindow4PhiAnalysis_max[0]*2,comptonSummedSpec2Clusters2Heads->GetMaximum()/3);
 	Y_text_top = 0.82;
 	getHistoPeak(comptonSummedSpec2Clusters2Heads, minPhotopeakE4PeakSearch*2, maxPhotopeakE4PeakSearch*2, locMaxPeak, locMaxPeakHeight);
 	Peak_FWHM_raw = getFWHM(comptonSummedSpec2Clusters2Heads, locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch*2, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -2788,8 +2793,8 @@ int main()
 	c1->SaveAs(Form("%s/%s.gif",outputPathPairs.Data(),TString(comptonSummedSpec2Clusters2Heads->GetName()).Data()));
 	
 	comptonSummedSpec2ClustersSelEvents2Heads->Draw();
-	line1->DrawLine(Ewindow4PhiAnalyis_min*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMinimum(),Ewindow4PhiAnalyis_min*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMaximum()/3);
-	line1->DrawLine(Ewindow4PhiAnalyis_max*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMinimum(),Ewindow4PhiAnalyis_max*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMaximum()/3);
+	line1->DrawLine(Ewindow4PhiAnalysis_min[0]*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMinimum(),Ewindow4PhiAnalysis_min[0]*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMaximum()/3);
+	line1->DrawLine(Ewindow4PhiAnalysis_max[0]*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMinimum(),Ewindow4PhiAnalysis_max[0]*2,comptonSummedSpec2ClustersSelEvents2Heads->GetMaximum()/3);
 	Y_text_top = 0.82;
 	getHistoPeak(comptonSummedSpec2ClustersSelEvents2Heads, minPhotopeakE4PeakSearch*2, maxPhotopeakE4PeakSearch*2, locMaxPeak, locMaxPeakHeight);
 	Peak_FWHM_raw = getFWHM(comptonSummedSpec2ClustersSelEvents2Heads, locMaxPeak, locMaxPeakHeight, 200, 200, minPhotopeakE4PeakSearch*2, 4000, Peak_FWHM_raw_leftEdge, Peak_FWHM_raw_rightEdge);
@@ -3197,8 +3202,8 @@ Bool_t analyseNextEvent(const Int_t ievent)
 			}
 		
 			Bool_t EnergyWindowCut = kTRUE;
-			if (sum2clE0 <= Ewindow4PhiAnalyis_min || sum2clE0 >= Ewindow4PhiAnalyis_max) EnergyWindowCut = kFALSE;
-			if (sum2clE1 <= Ewindow4PhiAnalyis_min || sum2clE1 >= Ewindow4PhiAnalyis_max) EnergyWindowCut = kFALSE;
+			if (sum2clE0 <= Ewindow4PhiAnalysis_min[0] || sum2clE0 >= Ewindow4PhiAnalysis_max[0]) EnergyWindowCut = kFALSE;
+			if (sum2clE1 <= Ewindow4PhiAnalysis_min[1] || sum2clE1 >= Ewindow4PhiAnalysis_max[1]) EnergyWindowCut = kFALSE;
 		
 			if (!skipEvent_cathode)
 			{
@@ -3354,8 +3359,8 @@ Bool_t analyseNextEvent(const Int_t ievent)
 	Float_t tEE1 = buffClusterE[0][firstClusterIdx[0]]+buffClusterE[0][secondClusterIdx[0]];
 	Float_t tEE2 = buffClusterE[1][firstClusterIdx[1]]+buffClusterE[1][secondClusterIdx[1]];
 	Bool_t EnergyWindowCut2 = kTRUE;
-	if (tEE1 <= Ewindow4PhiAnalyis_min || tEE1 >= Ewindow4PhiAnalyis_max) EnergyWindowCut2 = kFALSE;
-	if (tEE2 <= Ewindow4PhiAnalyis_min || tEE2 >= Ewindow4PhiAnalyis_max) EnergyWindowCut2 = kFALSE;
+	if (tEE1 <= Ewindow4PhiAnalysis_min[0] || tEE1 >= Ewindow4PhiAnalysis_max[0]) EnergyWindowCut2 = kFALSE;
+	if (tEE2 <= Ewindow4PhiAnalysis_min[1] || tEE2 >= Ewindow4PhiAnalysis_max[1]) EnergyWindowCut2 = kFALSE;
 
 	if (buffClusterX[0].size() == 2 && buffClusterX[1].size() == 2 && EnergyWindowCut2)
 	{
@@ -4118,18 +4123,33 @@ Bool_t readAnalysisSetupFile(TString fname)
 			if (printOutSetupFileParameters) cout << "relativePhiAngle = " << relativePhiAngle << endl;
 		}
 		
-		if (sline.Contains("Ewindow4PhiAnalyis_min ="))
+		if (sline.Contains("E1window4PhiAnalysis_min ="))
 		{
-			sline.ReplaceAll("Ewindow4PhiAnalyis_min =","");
-			Ewindow4PhiAnalyis_min = sline.Atof();
-			if (printOutSetupFileParameters) cout << "Ewindow4PhiAnalyis_min = " << Ewindow4PhiAnalyis_min << endl;
+			sline.ReplaceAll("E1window4PhiAnalysis_min =","");
+			//E1window4PhiAnalysis_min = sline.Atof();
+			Ewindow4PhiAnalysis_min[0] = sline.Atof();
+			if (printOutSetupFileParameters) cout << "E1window4PhiAnalysis_min = " << Ewindow4PhiAnalysis_min[0] << endl;
 		}
-		
-		if (sline.Contains("Ewindow4PhiAnalyis_max ="))
+		if (sline.Contains("E1window4PhiAnalysis_max ="))
 		{
-			sline.ReplaceAll("Ewindow4PhiAnalyis_max =","");
-			Ewindow4PhiAnalyis_max = sline.Atof();
-			if (printOutSetupFileParameters) cout << "Ewindow4PhiAnalyis_max = " << Ewindow4PhiAnalyis_max << endl;
+			sline.ReplaceAll("E1window4PhiAnalysis_max =","");
+			//E1window4PhiAnalysis_max = sline.Atof();
+			Ewindow4PhiAnalysis_max[0] = sline.Atof();
+			if (printOutSetupFileParameters) cout << "E1window4PhiAnalysis_max = " << Ewindow4PhiAnalysis_max[0] << endl;
+		}
+		if (sline.Contains("E2window4PhiAnalysis_min ="))
+		{
+			sline.ReplaceAll("E2window4PhiAnalysis_min =","");
+			//E2window4PhiAnalysis_min = sline.Atof();
+			Ewindow4PhiAnalysis_min[1] = sline.Atof();
+			if (printOutSetupFileParameters) cout << "E2window4PhiAnalysis_min = " << Ewindow4PhiAnalysis_min[1] << endl;
+		}	
+		if (sline.Contains("E2window4PhiAnalysis_max ="))
+		{
+			sline.ReplaceAll("E2window4PhiAnalysis_max =","");
+			//E2window4PhiAnalysis_max = sline.Atof();
+			Ewindow4PhiAnalysis_max[1] = sline.Atof();
+			if (printOutSetupFileParameters) cout << "E2window4PhiAnalysis_max = " << Ewindow4PhiAnalysis_max[1] << endl;
 		}
 		
 		if (sline.Contains("Theta1WindowFor4PhiAnalyis_min ="))

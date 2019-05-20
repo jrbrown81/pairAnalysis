@@ -1,7 +1,7 @@
 printOutSetupFileParameters = 0
 
 spectrumName = Na-22, 1400V
-pathRoot_in_calib = /home/gate/qnap/GATE/QET/setup
+pathRoot_in_calib = /home/gate/work/setup
 fname_pixel_mapping_file = LISA_QET_pixel_map_config
 TcalibFileName = timingCalib_400ns_60mV_2us
 
@@ -47,18 +47,18 @@ Na22Energy = 511
 XRF_Cd = 23.17
 XRF_Te = 27.47
 // all angles are in degrees
-angleOfSecondHead = 0
-relativePhiAngle = 90
-Ewindow4PhiAnalyis_min = 480
-Ewindow4PhiAnalyis_max = 540
+angleOfSecondHead = 23
+relativePhiAngle = 0
+Ewindow4PhiAnalyis_min = 0
+Ewindow4PhiAnalyis_max = 600
 EtotWindow4PhiAnalyis_min = 960
 EtotWindow4PhiAnalyis_max = 1080
 // AM0
-Theta1WindowFor4PhiAnalyis_min = 94
-Theta1WindowFor4PhiAnalyis_max = 102
+Theta1WindowFor4PhiAnalyis_min = 0
+Theta1WindowFor4PhiAnalyis_max = 180
 // AM1
-Theta2WindowFor4PhiAnalyis_min = 94
-Theta2WindowFor4PhiAnalyis_max = 102
+Theta2WindowFor4PhiAnalyis_min = 0
+Theta2WindowFor4PhiAnalyis_max = 180
 // This means that if the theta window cut values above are not identical, then they could be applied on either head and not specifically to AM0 or AM1
 makeAsymmetricThetaWindow = 0
 makeCosineFit = 0
