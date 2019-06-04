@@ -343,6 +343,7 @@ TH2F **theta_firstCluster_XYtE_Corr;
 TH2F **theta_firstCluster_XYtE_Corr_w;
 TH1F **clusterSize;
 TH2F *theta0_theta1_FromFirstClusterE;
+TH2F *theta0_theta1_FromFirstClusterE_Ewin;
 TH2F **clusterSize_nClusters;
 TH1F **numberOfClusters;
 TH2F **clusterMaxE_vsSize;
@@ -1604,11 +1605,17 @@ int main()
 	phiAngleSelEventsCorr->GetYaxis()->SetTitleOffset(1.4);
 	phiAngleSelEventsCorr->GetYaxis()->SetTitle("#varphi AM1, degrees");	
 	
-	theta0_theta1_FromFirstClusterE = new TH2F("theta0_theta1_FromFirstClusterE",Form("%s, #theta_{0} - #theta_{1} calculated from first interaction energy",spectrumName.Data()),nBinsTheta4H,0,180,nBinsTheta4H,0,180);
-	theta0_theta1_FromFirstClusterE->GetXaxis()->SetTitleOffset(1.2);
-	theta0_theta1_FromFirstClusterE->GetXaxis()->SetTitle("#theta in AM0, degrees");
-	theta0_theta1_FromFirstClusterE->GetYaxis()->SetTitleOffset(1.4);
-	theta0_theta1_FromFirstClusterE->GetYaxis()->SetTitle("#theta in AM1, degrees");
+   theta0_theta1_FromFirstClusterE = new TH2F("theta0_theta1_FromFirstClusterE",Form("%s, #theta_{0} - #theta_{1} calculated from first interaction energy",spectrumName.Data()),nBinsTheta4H,0,180,nBinsTheta4H,0,180);
+   theta0_theta1_FromFirstClusterE->GetXaxis()->SetTitleOffset(1.2);
+   theta0_theta1_FromFirstClusterE->GetXaxis()->SetTitle("#theta in AM0, degrees");
+   theta0_theta1_FromFirstClusterE->GetYaxis()->SetTitleOffset(1.4);
+   theta0_theta1_FromFirstClusterE->GetYaxis()->SetTitle("#theta in AM1, degrees");
+   
+	theta0_theta1_FromFirstClusterE_Ewin = new TH2F("theta0_theta1_FromFirstClusterE_Ewin",Form("%s, #theta_{0} - #theta_{1} calculated from first interaction energy, with E window",spectrumName.Data()),nBinsTheta4H,0,180,nBinsTheta4H,0,180);
+	theta0_theta1_FromFirstClusterE_Ewin->GetXaxis()->SetTitleOffset(1.2);
+	theta0_theta1_FromFirstClusterE_Ewin->GetXaxis()->SetTitle("#theta in AM0, degrees");
+	theta0_theta1_FromFirstClusterE_Ewin->GetYaxis()->SetTitleOffset(1.4);
+	theta0_theta1_FromFirstClusterE_Ewin->GetYaxis()->SetTitle("#theta in AM1, degrees");
 
 	matrix_trigs.clear();
 	matrix_trigs.resize(nPixXY, vector<Int_t>(nPixXY));
@@ -2845,6 +2852,12 @@ int main()
 	c2->GetPad(0)->SetLogz(1);
 	c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(theta0_theta1_FromFirstClusterE->GetName()).Data()));
 	c2->GetPad(0)->SetLogz(0);
+ 
+   theta0_theta1_FromFirstClusterE_Ewin->Draw("colz");
+   c2->SaveAs(Form("%s/%s.png",outputPathPairs.Data(),TString(theta0_theta1_FromFirstClusterE_Ewin->GetName()).Data()));
+   c2->GetPad(0)->SetLogz(1);
+   c2->SaveAs(Form("%s/%s_logz.png",outputPathPairs.Data(),TString(theta0_theta1_FromFirstClusterE_Ewin->GetName()).Data()));
+   c2->GetPad(0)->SetLogz(0);
 	
 	delete c0;
 	delete c1;
@@ -2989,6 +3002,7 @@ int main()
 	comptonSummedSpec2ClustersSelEventsCorr->Write();
 	comptonSummedSpec2ClustersSelEvents2Heads->Write();
 	theta0_theta1_FromFirstClusterE->Write();
+   theta0_theta1_FromFirstClusterE_Ewin->Write();
 	hfile->Close();
 }
 
@@ -3235,7 +3249,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 				}
 				if (thetaWindowCut) 
 				{
-					dPhiXYtAngle->Fill(dPh);
+					dPhiXYtAngle->Fill(dPh); // These histograms aren't saved
 					dPhiXYtAngleNorm->Fill(dPh);
 					dPhiXYtAngle1->Fill(dPh);
 					dPhiXYtAngle1Norm->Fill(dPh);
@@ -3249,7 +3263,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 				}				
 				if (theta0 > Theta1WindowFor4PhiAnalyis_min && theta0 < Theta1WindowFor4PhiAnalyis_max && theta1 > Theta1WindowFor4PhiAnalyis_min && theta1 < Theta1WindowFor4PhiAnalyis_max)	
 				{
-					dPhiAngle_w->Fill(dPh,www1*www1a);
+					dPhiAngle_w->Fill(dPh,www1*www1a); // These histograms aren't saved
 					dPhiAngleNorm_w->Fill(dPh,www1*www1a);
 					if (EnergyWindowCut)
 					{
@@ -3279,7 +3293,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 				}
 				if (theta0a > Theta1WindowFor4PhiAnalyis_min && theta0a < Theta1WindowFor4PhiAnalyis_max && theta1a > Theta1WindowFor4PhiAnalyis_min && theta1a < Theta1WindowFor4PhiAnalyis_max)	
 				{
-					dPhiAngle_w->Fill(dPh,www1*www2a);
+					dPhiAngle_w->Fill(dPh,www1*www2a);  // Pretty sure these should be www2*www2a. Not sure what these represent anyway.
 					dPhiAngleNorm_w->Fill(dPh,www1*www2a);
 					if (EnergyWindowCut)
 					{
@@ -3348,8 +3362,9 @@ Bool_t analyseNextEvent(const Int_t ievent)
 					if (theta1_xyt > 60) thetaFromXYtClusterE_dPhi_w[1]->Fill(theta1_xyt,dPh,www1a);
 					if (theta1a_xyt > 60) thetaFromXYtClusterE_dPhi_w[1]->Fill(theta1a_xyt,dPh,www2a);					
 					
-					theta0_theta1_FromFirstClusterE->Fill(theta0,theta1);
-				}
+					theta0_theta1_FromFirstClusterE_Ewin->Fill(theta0,theta1);
+				} // End of EnergyWindowCut
+            theta0_theta1_FromFirstClusterE->Fill(theta0,theta1);
 			}
 		}
 		comptonSummedSpec2ClustersCorr->Fill(sum2clE0,sum2clE1);
@@ -4703,11 +4718,12 @@ Double_t fitfun(Double_t *x, Double_t *par)
 	return par[0]*TMath::Cos(2*x[0]*TMath::DegToRad()-TMath::Pi())+par[1];
 }
 
-void sortClusters(const Int_t am)
+void sortClusters(const Int_t am) // What is the point of this?
 {
 	firstClusterIdx[am] = 0;
 	secondClusterIdx[am] = 1;
 	/*
+   // This must be Alex's attempt to use the most central interaction as the first
 	Float_t xx = 6;
 	Float_t yy = 17;
 	if (am == 1)
