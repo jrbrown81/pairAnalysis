@@ -1,4 +1,4 @@
-printOutSetupFileParameters = 0
+printOutSetupFileParameters = 1
 
 spectrumName = Na-22, 1400V
 pathRoot_in_calib = /shared/storage/physhad/Medical/DMatrix_data_backup/setup
@@ -49,18 +49,18 @@ XRF_Te = 27.47
 // all angles are in degrees
 angleOfSecondHead = 0
 relativePhiAngle = 0
-E1window4PhiAnalyis_min = 480
-E1window4PhiAnalyis_max = 540
-E2window4PhiAnalyis_min = 480
-E2window4PhiAnalyis_max = 540
-EtotWindow4PhiAnalyis_min = 960
-EtotWindow4PhiAnalyis_max = 1080
+E1window4PhiAnalysis_min = 480
+E1window4PhiAnalysis_max = 540
+E2window4PhiAnalysis_min = 480
+E2window4PhiAnalysis_max = 540
+EtotWindow4PhiAnalysis_min = 960
+EtotWindow4PhiAnalysis_max = 1080
 // AM0
-Theta1WindowFor4PhiAnalyis_min = 90
-Theta1WindowFor4PhiAnalyis_max = 110
+Theta1WindowFor4PhiAnalysis_min = 90
+Theta1WindowFor4PhiAnalysis_max = 110
 // AM1
-Theta2WindowFor4PhiAnalyis_min = 90
-Theta2WindowFor4PhiAnalyis_max = 110
+Theta2WindowFor4PhiAnalysis_min = 90
+Theta2WindowFor4PhiAnalysis_max = 110
 // This means that if the theta window cut values above are not identical, then they could be applied on either head and not specifically to AM0 or AM1
 makeAsymmetricThetaWindow = 0
 makeCosineFit = 0
