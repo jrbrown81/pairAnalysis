@@ -785,7 +785,7 @@ int main()
 		}
 	}
 	
-	TFile* f_ref = new TFile("probabilites_ref.root", "read");
+	TFile* f_ref = new TFile("probabilities_ref.root", "read");
 	prob_h1 = (TH1F *) f_ref->Get("probThetaRec_E1_vs_E1");
 	prob2_h1 = (TH1F *) f_ref->Get("prob2ThetaRec_E1_vs_E1");
 	prob_h1->SetName("prob_h1");

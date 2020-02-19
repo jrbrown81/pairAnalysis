@@ -48,7 +48,7 @@ XRF_Cd = 23.17
 XRF_Te = 27.47
 // all angles are in degrees
 angleOfSecondHead = 0
-relativePhiAngle = 0
+relativePhiAngle = 90
 E1window4PhiAnalysis_min = 480
 E1window4PhiAnalysis_max = 540
 E2window4PhiAnalysis_min = 480
