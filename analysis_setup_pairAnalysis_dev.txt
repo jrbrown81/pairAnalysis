@@ -1,7 +1,7 @@
-printOutSetupFileParameters = 0
+printOutSetupFileParameters = 1
 
 spectrumName = Na-22, 1400V
-pathRoot_in_calib = /home/gate/work/setup
+pathRoot_in_calib = /shared/storage/physhad/Medical/DMatrix_data_backup/setup
 fname_pixel_mapping_file = LISA_QET_pixel_map_config
 TcalibFileName = timingCalib_400ns_60mV_2us
 
@@ -47,20 +47,20 @@ Na22Energy = 511
 XRF_Cd = 23.17
 XRF_Te = 27.47
 // all angles are in degrees
-angleOfSecondHead = 23
+angleOfSecondHead = 0
 relativePhiAngle = 0
 E1window4PhiAnalysis_min = 480
 E1window4PhiAnalysis_max = 540
-E2window4PhiAnalysis_min = 370
-E2window4PhiAnalysis_max = 470
-EEtotWindow4PhiAnalyis_min = 960
-EtotWindow4PhiAnalyis_max = 1080
+E2window4PhiAnalysis_min = 480
+E2window4PhiAnalysis_max = 540
+EtotWindow4PhiAnalysis_min = 960
+EtotWindow4PhiAnalysis_max = 1080
 // AM0
-Theta1WindowFor4PhiAnalyis_min = 0
-Theta1WindowFor4PhiAnalyis_max = 180
+Theta1WindowFor4PhiAnalysis_min = 90
+Theta1WindowFor4PhiAnalysis_max = 110
 // AM1
-Theta2WindowFor4PhiAnalyis_min = 0
-Theta2WindowFor4PhiAnalyis_max = 180
+Theta2WindowFor4PhiAnalysis_min = 90
+Theta2WindowFor4PhiAnalysis_max = 110
 // This means that if the theta window cut values above are not identical, then they could be applied on either head and not specifically to AM0 or AM1
 makeAsymmetricThetaWindow = 0
 makeCosineFit = 0
@@ -81,7 +81,7 @@ nBinsDeltaAnodeTiming4H = 200
 // 0 - all, 1 - fully internal (disable two most external rows), 2 - internal (disable one external row), 3 - NOT fully internal, 4 - NOT internal
 typeOfPixelsToUse = 0
 
-nBins_dPhi = 38
+nBins_dPhi = 18
 nBinsTheta4H = 36
 // In pixels
 maxDistanceBetweenClusters4ComptonPair = 10
