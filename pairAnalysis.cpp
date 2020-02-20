@@ -36,6 +36,7 @@ void sortClusters(const Int_t);
 Double_t fitMAC(Double_t *, Double_t *);
 void updateClustersWithNeighboursEnergy(const Int_t, const Int_t);
 Float_t getThetaAngleFromHitsXYt(const Int_t, const Float_t, const Float_t, const Float_t, const Float_t, const Float_t, const Float_t);
+Float_t getBestTheta(const Float_t eneRef, const Float_t ene1, const Float_t ene2, const Int_t am, const Float_t x1, const Float_t x2, const Float_t y1, const Float_t y2, const Float_t t1, const Float_t t2);
 
 const Int_t nMAC = 11;
 const Int_t nMACbd = 5;
@@ -47,6 +48,7 @@ TH1F * prob2_h1;
 Float_t dPh, sum2clE0, sum2clE1;
 Float_t theta0, theta1, theta0a, theta1a;
 Float_t theta0_xyt, theta1_xyt, theta0a_xyt, theta1a_xyt;
+Float_t theta0_best, theta1_best;
 Bool_t EnergyWindowCut;
 Bool_t thetaWindowCut;
 Bool_t energyCut;
@@ -408,6 +410,8 @@ int main()
 	tree->Branch("theta1_xyt",&theta1_xyt,"theta1_xyt/F");
 	tree->Branch("theta0a_xyt",&theta0a_xyt,"theta0a_xyt/F");
 	tree->Branch("theta1a_xyt",&theta1a_xyt,"theta1a_xyt/F");
+	tree->Branch("theta0_best",&theta0_best,"theta0_best/F");
+	tree->Branch("theta1_best",&theta1_best,"theta1_best/F");
 	tree->Branch("energy0",&sum2clE0,"energy0/F");
 	tree->Branch("energy1",&sum2clE1,"energy1/F");
 	tree->Branch("thetaCut",&thetaWindowCut,"thetaCut/O");
@@ -2193,6 +2197,9 @@ Bool_t analyseNextEvent(const Int_t ievent)
 			theta0_xyt = 180 - theta0a_xyt;
 			theta1_xyt = 180 - theta1a_xyt;
 			
+			theta0_best = getBestTheta(Na22Energy,buffClusterE[0][firstClusterIdx[0]],buffClusterE[0][secondClusterIdx[0]],			0,buffClusterX[0][firstClusterIdx[0]],buffClusterX[0][secondClusterIdx[0]],buffClusterY[0][firstClusterIdx[0]],buffClusterY[0][secondClusterIdx[0]],buffClusterAnodeTiming[0][firstClusterIdx[0]],buffClusterAnodeTiming[0][secondClusterIdx[0]]);
+			theta1_best = getBestTheta(Na22Energy,buffClusterE[1][firstClusterIdx[1]],buffClusterE[1][secondClusterIdx[1]],			1,buffClusterX[1][firstClusterIdx[1]],buffClusterX[1][secondClusterIdx[1]],buffClusterY[1][firstClusterIdx[1]],buffClusterY[1][secondClusterIdx[1]],buffClusterAnodeTiming[1][firstClusterIdx[1]],buffClusterAnodeTiming[1][secondClusterIdx[1]]);
+			
 			phiAngleCorr->Fill(phiAng0,phiAng1mirrored_shifted);
 			dPh = phiAng0-phiAng1mirrored_shifted;
 			if (dPh > 180) dPh = 360 - dPh;
@@ -3248,4 +3255,18 @@ Float_t getThetaFromEnergy(const Float_t eneRef, const Float_t ene)
 {
 //	return TMath::ACos(1.-ene/(eneRef-ene))*TMath::RadToDeg();
 	return TMath::ACos(1.+eRestMass/eneRef-eRestMass/(eneRef-ene))*TMath::RadToDeg();
+}
+
+Float_t getBestTheta(const Float_t eneRef, const Float_t ene1, const Float_t ene2, const Int_t am, const Float_t x1, const Float_t x2, const Float_t y1, const Float_t y2, const Float_t t1, const Float_t t2)
+{
+	Float_t thetaE_A = getThetaFromEnergy(eneRef,ene1);
+	Float_t thetaE_B = getThetaFromEnergy(eneRef,ene2);
+	Float_t thetaXYt_B = getThetaAngleFromHitsXYt(am,x1,x2,y1,y2,t1,t2);
+	Float_t thetaXYt_A = 180 - thetaXYt_B;
+	
+	Float_t thetaDiffFactor_A = TMath::Abs(thetaE_A/thetaXYt_A-1);
+	Float_t thetaDiffFactor_B = TMath::Abs(thetaE_B/thetaXYt_B-1);
+	
+	if(thetaDiffFactor_A<thetaDiffFactor_B) return (thetaE_A+thetaXYt_A)/2;
+	else return (thetaE_B+thetaXYt_B)/2;
 }
