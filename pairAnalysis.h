@@ -108,10 +108,16 @@ Float_t relativePhiAngle = 90;
 Float_t Ewindow4PhiAnalysis_min[2] = {530,530};
 Float_t Ewindow4PhiAnalysis_max[2] = {530,530};
 
-Float_t Theta1WindowFor4PhiAnalyis_min = 60;
-Float_t Theta1WindowFor4PhiAnalyis_max = 90;
-Float_t Theta2WindowFor4PhiAnalyis_min = 60;
-Float_t Theta2WindowFor4PhiAnalyis_max = 90;
+Float_t Theta1WindowFor4PhiAnalysis_min = 60;
+Float_t Theta1WindowFor4PhiAnalysis_max = 90;
+Float_t Theta2WindowFor4PhiAnalysis_min = 60;
+Float_t Theta2WindowFor4PhiAnalysis_max = 90;
+
+Float_t bestTheta1WindowFor4PhiAnalysis_min = 60;
+Float_t bestTheta1WindowFor4PhiAnalysis_max = 90;
+Float_t bestTheta2WindowFor4PhiAnalysis_min = 60;
+Float_t bestTheta2WindowFor4PhiAnalysis_max = 90;
+
 Bool_t makeAsymmetricThetaWindow = kFALSE;
 Bool_t makeCosineFit = kFALSE;
 Float_t *factor2ConvertAnodeTime2Distance;
@@ -257,6 +263,8 @@ TH1F **phiAngle;
 TH1F **phiAngleSelEvents;
 TH1F *dPhiAngle;
 TH1F *dPhiAngle_Ewin;
+TH1F *dPhiAngle_bestTheta;
+TH1F *dPhiAngle_bestTheta_Ewin;
 TH1F *dPhiAngle_w;
 TH1F *dPhiAngle_Ewin_w;
 TH1F *dPhiAngleNorm;
@@ -919,6 +927,10 @@ void setupGlobalHistos()
 	dPhiAngle->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle->GetXaxis()->SetTitle("#Delta#varphi, degrees");
 
+	dPhiAngle_bestTheta = new TH1F("dPhiAngle_bestTheta",Form("%s, #Delta#varphi",spectrumName.Data()),nBins_dPhi,-180,180);
+	dPhiAngle_bestTheta->GetXaxis()->SetTitleOffset(1.2);
+	dPhiAngle_bestTheta->GetXaxis()->SetTitle("#Delta#varphi, degrees");
+
 	dPhiAngle_w = new TH1F("dPhiAngle_w",Form("%s, #Delta#varphi, weighted",spectrumName.Data()),nBins_dPhi,-180,180);
 	dPhiAngle_w->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle_w->GetXaxis()->SetTitle("#Delta#varphi, degrees");
@@ -942,6 +954,10 @@ void setupGlobalHistos()
 	dPhiAngle_Ewin = new TH1F("dPhiAngle_Ewin",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi,-180,180);
 	dPhiAngle_Ewin->GetXaxis()->SetTitleOffset(1.2);
 	dPhiAngle_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");
+	
+	dPhiAngle_bestTheta_Ewin = new TH1F("dPhiAngle_bestTheta_Ewin",Form("%s, #Delta#varphi",spectrumName.Data()),nBins_dPhi,-180,180);
+	dPhiAngle_bestTheta_Ewin->GetXaxis()->SetTitleOffset(1.2);
+	dPhiAngle_bestTheta_Ewin->GetXaxis()->SetTitle("#Delta#varphi, degrees");
 
 	dPhiAngle_Ewin_w = new TH1F("dPhiAngle_Ewin_w",Form("%s, #Delta#varphi within  %.0f keV < E < %.0f keV, weighted",spectrumName.Data(),Ewindow4PhiAnalysis_min[0],Ewindow4PhiAnalysis_max[0]),nBins_dPhi,-180,180);
 	dPhiAngle_Ewin_w->GetXaxis()->SetTitleOffset(1.2);
@@ -1245,32 +1261,54 @@ Bool_t readAnalysisSetupFile(TString fname)
 			if (printOutSetupFileParameters) cout << "E2window4PhiAnalysis_max = " << Ewindow4PhiAnalysis_max[1] << endl;
 		}
 		
-		if (sline.Contains("Theta1WindowFor4PhiAnalyis_min ="))
+		if (sline.Contains("Theta1WindowFor4PhiAnalysis_min ="))
 		{
-			sline.ReplaceAll("Theta1WindowFor4PhiAnalyis_min =","");
-			Theta1WindowFor4PhiAnalyis_min = sline.Atof();
-			if (printOutSetupFileParameters) cout << "Theta1WindowFor4PhiAnalyis_min = " << Theta1WindowFor4PhiAnalyis_min << endl;
+			sline.ReplaceAll("Theta1WindowFor4PhiAnalysis_min =","");
+			Theta1WindowFor4PhiAnalysis_min = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Theta1WindowFor4PhiAnalysis_min = " << Theta1WindowFor4PhiAnalysis_min << endl;
+		}
+		if (sline.Contains("Theta1WindowFor4PhiAnalysis_max ="))
+		{
+			sline.ReplaceAll("Theta1WindowFor4PhiAnalysis_max =","");
+			Theta1WindowFor4PhiAnalysis_max = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Theta1WindowFor4PhiAnalysis_max = " << Theta1WindowFor4PhiAnalysis_max << endl;
+		}
+		if (sline.Contains("Theta2WindowFor4PhiAnalysis_min ="))
+		{
+			sline.ReplaceAll("Theta2WindowFor4PhiAnalysis_min =","");
+			Theta2WindowFor4PhiAnalysis_min = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Theta2WindowFor4PhiAnalysis_min = " << Theta2WindowFor4PhiAnalysis_min << endl;
+		}
+		if (sline.Contains("Theta2WindowFor4PhiAnalysis_max ="))
+		{
+			sline.ReplaceAll("Theta2WindowFor4PhiAnalysis_max =","");
+			Theta2WindowFor4PhiAnalysis_max = sline.Atof();
+			if (printOutSetupFileParameters) cout << "Theta2WindowFor4PhiAnalysis_max = " << Theta2WindowFor4PhiAnalysis_max << endl;
 		}
 		
-		if (sline.Contains("Theta1WindowFor4PhiAnalyis_max ="))
+		if (sline.Contains("theta1Best4PhiAnalysis_min ="))
 		{
-			sline.ReplaceAll("Theta1WindowFor4PhiAnalyis_max =","");
-			Theta1WindowFor4PhiAnalyis_max = sline.Atof();
-			if (printOutSetupFileParameters) cout << "Theta1WindowFor4PhiAnalyis_max = " << Theta1WindowFor4PhiAnalyis_max << endl;
+			sline.ReplaceAll("theta1Best4PhiAnalysis_min =","");
+			bestTheta1WindowFor4PhiAnalysis_min = sline.Atof();
+			if (printOutSetupFileParameters) cout << "theta1Best4PhiAnalysis_min = " << bestTheta1WindowFor4PhiAnalysis_min << endl;
 		}
-		
-		if (sline.Contains("Theta2WindowFor4PhiAnalyis_min ="))
+		if (sline.Contains("theta1Best4PhiAnalysis_max ="))
 		{
-			sline.ReplaceAll("Theta2WindowFor4PhiAnalyis_min =","");
-			Theta2WindowFor4PhiAnalyis_min = sline.Atof();
-			if (printOutSetupFileParameters) cout << "Theta2WindowFor4PhiAnalyis_min = " << Theta2WindowFor4PhiAnalyis_min << endl;
+			sline.ReplaceAll("theta1Best4PhiAnalysis_max =","");
+			bestTheta1WindowFor4PhiAnalysis_max = sline.Atof();
+			if (printOutSetupFileParameters) cout << "theta1Best4PhiAnalysis_max = " << bestTheta1WindowFor4PhiAnalysis_max << endl;
 		}
-		
-		if (sline.Contains("Theta2WindowFor4PhiAnalyis_max ="))
+		if (sline.Contains("theta2Best4PhiAnalysis_min ="))
 		{
-			sline.ReplaceAll("Theta2WindowFor4PhiAnalyis_max =","");
-			Theta2WindowFor4PhiAnalyis_max = sline.Atof();
-			if (printOutSetupFileParameters) cout << "Theta2WindowFor4PhiAnalyis_max = " << Theta2WindowFor4PhiAnalyis_max << endl;
+			sline.ReplaceAll("theta2Best4PhiAnalysis_min =","");
+			bestTheta2WindowFor4PhiAnalysis_min = sline.Atof();
+			if (printOutSetupFileParameters) cout << "theta2Best4PhiAnalysis_min = " << bestTheta2WindowFor4PhiAnalysis_min << endl;
+		}
+		if (sline.Contains("theta2Best4PhiAnalysis_max ="))
+		{
+			sline.ReplaceAll("theta2Best4PhiAnalysis_max =","");
+			bestTheta2WindowFor4PhiAnalysis_max = sline.Atof();
+			if (printOutSetupFileParameters) cout << "theta2Best4PhiAnalysis_max = " << bestTheta2WindowFor4PhiAnalysis_max << endl;
 		}
 		
 		if (sline.Contains("nBins_dPhi ="))

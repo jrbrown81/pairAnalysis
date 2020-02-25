@@ -38,6 +38,8 @@ void updateClustersWithNeighboursEnergy(const Int_t, const Int_t);
 Float_t getThetaAngleFromHitsXYt(const Int_t, const Float_t, const Float_t, const Float_t, const Float_t, const Float_t, const Float_t);
 Float_t getBestTheta(const Float_t eneRef, const Float_t ene1, const Float_t ene2, const Int_t am, const Float_t x1, const Float_t x2, const Float_t y1, const Float_t y2, const Float_t t1, const Float_t t2);
 
+Float_t ComptonEdge = Na22Energy-getScatteredEnergyFromAngle(Na22Energy,180);
+
 const Int_t nMAC = 11;
 const Int_t nMACbd = 5;
 const Double_t e4MAC[nMAC] = {40,50,60,80,100,150,200,300,400,500,600}; 
@@ -46,11 +48,13 @@ TH1F * prob_h1;
 TH1F * prob2_h1;
 
 Float_t dPh, sum2clE0, sum2clE1;
+Float_t energy0a, energy0b, energy1a, energy1b;
 Float_t theta0, theta1, theta0a, theta1a;
 Float_t theta0_xyt, theta1_xyt, theta0a_xyt, theta1a_xyt;
 Float_t theta0_best, theta1_best;
 Bool_t EnergyWindowCut;
 Bool_t thetaWindowCut;
+Bool_t bestThetaWindowCut;
 Bool_t energyCut;
 TFile *hfile;//hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
 TTree* tree = new TTree("tree","Output events tree");
@@ -414,7 +418,12 @@ int main()
 	tree->Branch("theta1_best",&theta1_best,"theta1_best/F");
 	tree->Branch("energy0",&sum2clE0,"energy0/F");
 	tree->Branch("energy1",&sum2clE1,"energy1/F");
+	tree->Branch("energy0a",&energy0a,"energy0a/F");
+	tree->Branch("energy0b",&energy0b,"energy0b/F");
+	tree->Branch("energy1a",&energy1a,"energy1a/F");
+	tree->Branch("energy1b",&energy1b,"energy1b/F");
 	tree->Branch("thetaCut",&thetaWindowCut,"thetaCut/O");
+	tree->Branch("bestThetaCut",&bestThetaWindowCut,"bestThetaCut/O");
 	tree->Branch("energyCut",&EnergyWindowCut,"energyCut/O");
 
 	image = new TH2F("image","Event image",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
@@ -2025,8 +2034,10 @@ int main()
 	dPhiXYtAngle1Norm->Write();
 	dPhiXYtAngle1Norm_Ewin->Write();
 	dPhiAngle->Write();
+	dPhiAngle_bestTheta->Write();
 	dPhiAngleNorm->Write();
 	dPhiAngle_Ewin->Write();
+	dPhiAngle_bestTheta_Ewin->Write();
 	dPhiAngleNorm_Ewin->Write();
 	dPhiAngle1->Write();
 	dPhiAngle1_Ewin->Write();
@@ -2123,6 +2134,10 @@ Bool_t analyseNextEvent(const Int_t ievent)
 		Float_t initialE1 = getScatteredEnergyFromAngle(Na22Energy, angleOfSecondHead);
 		sum2clE0 = buffClusterE[0][firstClusterIdx[0]]+buffClusterE[0][secondClusterIdx[0]];
 		sum2clE1 = buffClusterE[1][firstClusterIdx[1]]+buffClusterE[1][secondClusterIdx[1]];
+		energy0a = buffClusterE[0][firstClusterIdx[0]];
+		energy0b = buffClusterE[0][secondClusterIdx[0]];
+		energy1a = buffClusterE[1][firstClusterIdx[1]];
+		energy1b = buffClusterE[1][secondClusterIdx[1]];
 		
 		sortClusters(0);
 		Float_t xcentre = 6, ycentre = 17;
@@ -2233,29 +2248,36 @@ Bool_t analyseNextEvent(const Int_t ievent)
 		
 			// true is good
 			thetaWindowCut = kTRUE;
+			bestThetaWindowCut = kTRUE;
 			if (makeAsymmetricThetaWindow)
 			{
-				if (!((theta0 > Theta1WindowFor4PhiAnalyis_min && theta0 < Theta1WindowFor4PhiAnalyis_max && theta1 > Theta2WindowFor4PhiAnalyis_min && theta1 < Theta2WindowFor4PhiAnalyis_max)
-						|| (theta0 > Theta2WindowFor4PhiAnalyis_min && theta0 < Theta2WindowFor4PhiAnalyis_max && theta1 > Theta1WindowFor4PhiAnalyis_min && theta1 < Theta1WindowFor4PhiAnalyis_max)))
+				if (!((theta0 > Theta1WindowFor4PhiAnalysis_min && theta0 < Theta1WindowFor4PhiAnalysis_max && theta1 > Theta2WindowFor4PhiAnalysis_min && theta1 < Theta2WindowFor4PhiAnalysis_max)
+						|| (theta0 > Theta2WindowFor4PhiAnalysis_min && theta0 < Theta2WindowFor4PhiAnalysis_max && theta1 > Theta1WindowFor4PhiAnalysis_min && theta1 < Theta1WindowFor4PhiAnalysis_max)))
 									thetaWindowCut = kFALSE;
+				if (!((theta0_best > bestTheta1WindowFor4PhiAnalysis_min && theta0_best < bestTheta1WindowFor4PhiAnalysis_max && theta1_best > bestTheta2WindowFor4PhiAnalysis_min && theta1_best < bestTheta2WindowFor4PhiAnalysis_max)
+						|| (theta0_best > bestTheta2WindowFor4PhiAnalysis_min && theta0_best < bestTheta2WindowFor4PhiAnalysis_max && theta1_best > bestTheta1WindowFor4PhiAnalysis_min && theta1_best < bestTheta1WindowFor4PhiAnalysis_max)))
+									bestThetaWindowCut = kFALSE;
 			}
 			else
 			{
-				if (theta0 <= Theta1WindowFor4PhiAnalyis_min || theta0 >= Theta1WindowFor4PhiAnalyis_max) thetaWindowCut = kFALSE;
-				if (theta1 <= Theta2WindowFor4PhiAnalyis_min || theta1 >= Theta2WindowFor4PhiAnalyis_max) thetaWindowCut = kFALSE;
+				if (theta0 <= Theta1WindowFor4PhiAnalysis_min || theta0 >= Theta1WindowFor4PhiAnalysis_max) thetaWindowCut = kFALSE;
+				if (theta1 <= Theta2WindowFor4PhiAnalysis_min || theta1 >= Theta2WindowFor4PhiAnalysis_max) thetaWindowCut = kFALSE;
+				
+				if (theta0_best <= bestTheta1WindowFor4PhiAnalysis_min || theta0_best >= bestTheta1WindowFor4PhiAnalysis_max) bestThetaWindowCut = kFALSE;
+				if (theta1_best <= bestTheta2WindowFor4PhiAnalysis_min || theta1_best >= bestTheta2WindowFor4PhiAnalysis_max) bestThetaWindowCut = kFALSE;
 			}
 			
 			Bool_t thetaXYtWindowCut = kTRUE;
 			if (makeAsymmetricThetaWindow)
 			{
-				if (!((theta0_xyt > Theta1WindowFor4PhiAnalyis_min && theta0_xyt < Theta1WindowFor4PhiAnalyis_max && theta1_xyt > Theta2WindowFor4PhiAnalyis_min && theta1_xyt < Theta2WindowFor4PhiAnalyis_max)
-						|| (theta0_xyt > Theta2WindowFor4PhiAnalyis_min && theta0_xyt < Theta2WindowFor4PhiAnalyis_max && theta1_xyt > Theta1WindowFor4PhiAnalyis_min && theta1_xyt < Theta1WindowFor4PhiAnalyis_max)))
+				if (!((theta0_xyt > Theta1WindowFor4PhiAnalysis_min && theta0_xyt < Theta1WindowFor4PhiAnalysis_max && theta1_xyt > Theta2WindowFor4PhiAnalysis_min && theta1_xyt < Theta2WindowFor4PhiAnalysis_max)
+						|| (theta0_xyt > Theta2WindowFor4PhiAnalysis_min && theta0_xyt < Theta2WindowFor4PhiAnalysis_max && theta1_xyt > Theta1WindowFor4PhiAnalysis_min && theta1_xyt < Theta1WindowFor4PhiAnalysis_max)))
 									thetaXYtWindowCut = kFALSE;
 			}
 			else
 			{
-				if (theta0_xyt <= Theta1WindowFor4PhiAnalyis_min || theta0_xyt >= Theta1WindowFor4PhiAnalyis_max) thetaXYtWindowCut = kFALSE;
-				if (theta1_xyt <= Theta2WindowFor4PhiAnalyis_min || theta1_xyt >= Theta2WindowFor4PhiAnalyis_max) thetaXYtWindowCut = kFALSE;
+				if (theta0_xyt <= Theta1WindowFor4PhiAnalysis_min || theta0_xyt >= Theta1WindowFor4PhiAnalysis_max) thetaXYtWindowCut = kFALSE;
+				if (theta1_xyt <= Theta2WindowFor4PhiAnalysis_min || theta1_xyt >= Theta2WindowFor4PhiAnalysis_max) thetaXYtWindowCut = kFALSE;
 			}
 		
 			EnergyWindowCut = kTRUE;
@@ -2303,8 +2325,13 @@ Bool_t analyseNextEvent(const Int_t ievent)
 						dPhiXYtAngle1_Ewin->Fill(dPh);
 						dPhiXYtAngle1Norm_Ewin->Fill(dPh);
 					}
-				}				
-				if (theta0 > Theta1WindowFor4PhiAnalyis_min && theta0 < Theta1WindowFor4PhiAnalyis_max && theta1 > Theta1WindowFor4PhiAnalyis_min && theta1 < Theta1WindowFor4PhiAnalyis_max)	
+				}
+				if (bestThetaWindowCut)
+				{
+					dPhiAngle_bestTheta->Fill(dPh);
+					if(EnergyWindowCut) dPhiAngle_bestTheta_Ewin->Fill(dPh);
+				}
+				if (theta0 > Theta1WindowFor4PhiAnalysis_min && theta0 < Theta1WindowFor4PhiAnalysis_max && theta1 > Theta1WindowFor4PhiAnalysis_min && theta1 < Theta1WindowFor4PhiAnalysis_max)
 				{
 					dPhiAngle_w->Fill(dPh,www1*www1a); // These histograms aren't saved
 					dPhiAngleNorm_w->Fill(dPh,www1*www1a);
@@ -2314,7 +2341,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 						dPhiAngleNorm_Ewin_w->Fill(dPh,www1*www1a);
 					}
 				}
-				if (theta0 > Theta1WindowFor4PhiAnalyis_min && theta0 < Theta1WindowFor4PhiAnalyis_max && theta1a > Theta1WindowFor4PhiAnalyis_min && theta1a < Theta1WindowFor4PhiAnalyis_max)	
+				if (theta0 > Theta1WindowFor4PhiAnalysis_min && theta0 < Theta1WindowFor4PhiAnalysis_max && theta1a > Theta1WindowFor4PhiAnalysis_min && theta1a < Theta1WindowFor4PhiAnalysis_max)
 				{
 					dPhiAngle_w->Fill(dPh,www1*www2a);
 					dPhiAngleNorm_w->Fill(dPh,www1*www2a);
@@ -2324,7 +2351,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 						dPhiAngleNorm_Ewin_w->Fill(dPh,www1*www2a);
 					}
 				}
-				if (theta0a > Theta1WindowFor4PhiAnalyis_min && theta0a < Theta1WindowFor4PhiAnalyis_max && theta1 > Theta1WindowFor4PhiAnalyis_min && theta1 < Theta1WindowFor4PhiAnalyis_max)	
+				if (theta0a > Theta1WindowFor4PhiAnalysis_min && theta0a < Theta1WindowFor4PhiAnalysis_max && theta1 > Theta1WindowFor4PhiAnalysis_min && theta1 < Theta1WindowFor4PhiAnalysis_max)
 				{
 					dPhiAngle_w->Fill(dPh,www2*www1a);
 					dPhiAngleNorm_w->Fill(dPh,www2*www1a);
@@ -2334,7 +2361,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 						dPhiAngleNorm_Ewin_w->Fill(dPh,www2*www1a);
 					}
 				}
-				if (theta0a > Theta1WindowFor4PhiAnalyis_min && theta0a < Theta1WindowFor4PhiAnalyis_max && theta1a > Theta1WindowFor4PhiAnalyis_min && theta1a < Theta1WindowFor4PhiAnalyis_max)	
+				if (theta0a > Theta1WindowFor4PhiAnalysis_min && theta0a < Theta1WindowFor4PhiAnalysis_max && theta1a > Theta1WindowFor4PhiAnalysis_min && theta1a < Theta1WindowFor4PhiAnalysis_max)
 				{
 					dPhiAngle_w->Fill(dPh,www1*www2a);  // Pretty sure these should be www2*www2a. Not sure what these represent anyway.
 					dPhiAngleNorm_w->Fill(dPh,www1*www2a);
@@ -3264,9 +3291,26 @@ Float_t getBestTheta(const Float_t eneRef, const Float_t ene1, const Float_t ene
 	Float_t thetaXYt_B = getThetaAngleFromHitsXYt(am,x1,x2,y1,y2,t1,t2);
 	Float_t thetaXYt_A = 180 - thetaXYt_B;
 	
+	if(ene1>ComptonEdge) return (thetaE_B+thetaXYt_B)/2; // Check that largest energy isn't greater than Compton edge
+
+//	Float_t thetaDiffFactor_A = pow(thetaE_A-thetaXYt_A,2);
+//	Float_t thetaDiffFactor_B = pow(thetaE_B-thetaXYt_B,2);
+	
+//	Float_t thetaDiffFactor_A = pow(thetaE_A,2)-pow(thetaXYt_A,2);
+//	Float_t thetaDiffFactor_B = pow(thetaE_B,2)-pow(thetaXYt_B,2);
+
 	Float_t thetaDiffFactor_A = TMath::Abs(thetaE_A/thetaXYt_A-1);
 	Float_t thetaDiffFactor_B = TMath::Abs(thetaE_B/thetaXYt_B-1);
 	
+//	if(thetaDiffFactor_A<thetaDiffFactor_B) return thetaE_A;
+//	else return thetaE_B;
+//	if(thetaDiffFactor_A<thetaDiffFactor_B) return thetaXYt_A;
+//	else return thetaXYt_B;
+
 	if(thetaDiffFactor_A<thetaDiffFactor_B) return (thetaE_A+thetaXYt_A)/2;
 	else return (thetaE_B+thetaXYt_B)/2;
+
+////	try ignoring thetaXYt and and just apply max energy selectrion to thetaE - doesn't have anything in 70-90
+//if(ene1>ComptonEdge) return thetaE_B; // Check that largest energy isn't greater than Compton edge
+//else return thetaE_A;
 }
