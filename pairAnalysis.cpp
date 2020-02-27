@@ -3275,7 +3275,17 @@ Double_t fitMAC(Double_t *x, Double_t *par)
 
 Float_t getThetaAngleFromHitsXYt(const Int_t am, const Float_t x1, const Float_t x2, const Float_t y1, const Float_t y2, const Float_t t1, const Float_t t2)
 {
-	return TMath::ATan(TMath::Hypot(x1-x2,y1-y2)*pixelPitch/(TMath::Abs(t1-t2)/factor2ConvertAnodeTime2Distance[am]))*TMath::RadToDeg();
+	return TMath::ATan(TMath::Hypot(x1-x2,y1-y2)*pixelPitch/((t1-t2)/factor2ConvertAnodeTime2Distance[am]))*TMath::RadToDeg();
+//	return TMath::ATan(TMath::Hypot(x1-x2,y1-y2)*pixelPitch/(TMath::Abs(t1-t2)/factor2ConvertAnodeTime2Distance[am]))*TMath::RadToDeg();
+}
+
+Float_t getCosThetaAngleFromHitsXYt(const Int_t am, const Float_t x1, const Float_t x2, const Float_t y1, const Float_t y2, const Float_t t1, const Float_t t2)
+{
+	Float_t dT = (t1-t2)/factor2ConvertAnodeTime2Distance[am];
+//	Float_t dT = TMath::Abs(t1-t2)/factor2ConvertAnodeTime2Distance[am];
+	Float_t dH = TMath::Hypot(x1-x2,y1-y2)*pixelPitch;
+	
+	return dT/TMath::Sqrt(pow(dH,2)+pow(dT,2));
 }
 
 Float_t getThetaFromEnergy(const Float_t eneRef, const Float_t ene)
@@ -3284,33 +3294,85 @@ Float_t getThetaFromEnergy(const Float_t eneRef, const Float_t ene)
 	return TMath::ACos(1.+eRestMass/eneRef-eRestMass/(eneRef-ene))*TMath::RadToDeg();
 }
 
-Float_t getBestTheta(const Float_t eneRef, const Float_t ene1, const Float_t ene2, const Int_t am, const Float_t x1, const Float_t x2, const Float_t y1, const Float_t y2, const Float_t t1, const Float_t t2)
+Float_t getCosThetaFromEnergy(const Float_t eneRef, const Float_t ene)
 {
-	Float_t thetaE_A = getThetaFromEnergy(eneRef,ene1);
-	Float_t thetaE_B = getThetaFromEnergy(eneRef,ene2);
-	Float_t thetaXYt_B = getThetaAngleFromHitsXYt(am,x1,x2,y1,y2,t1,t2);
-	Float_t thetaXYt_A = 180 - thetaXYt_B;
-	
-	if(ene1>ComptonEdge) return (thetaE_B+thetaXYt_B)/2; // Check that largest energy isn't greater than Compton edge
+//	return TMath::ACos(1.-ene/(eneRef-ene))*TMath::RadToDeg();
+	return 1.+eRestMass/eneRef-eRestMass/(eneRef-ene);
+}
 
+//Float_t getBestTheta(const Float_t eneRef, const Float_t ene1, const Float_t ene2, const Int_t am, const Float_t x1, const Float_t x2, const Float_t y1, const Float_t y2, const Float_t t1, const Float_t t2)
+//{
+//	Float_t thetaE_A = getThetaFromEnergy(eneRef,ene1);
+//	Float_t thetaE_B = getThetaFromEnergy(eneRef,ene2);
+//	Float_t thetaXYt_B = getThetaAngleFromHitsXYt(am,x1,x2,y1,y2,t1,t2);
+//	Float_t thetaXYt_A = 180 - thetaXYt_B;
+//
+//	if(ene1>ComptonEdge) return (thetaE_B+thetaXYt_B)/2; // Check that largest energy isn't greater than Compton edge
+//
+////	Float_t thetaDiffFactor_A = TMath::Abs(thetaE_A/thetaXYt_A-1);
+////	Float_t thetaDiffFactor_B = TMath::Abs(thetaE_B/thetaXYt_B-1);
+//
 //	Float_t thetaDiffFactor_A = pow(thetaE_A-thetaXYt_A,2);
 //	Float_t thetaDiffFactor_B = pow(thetaE_B-thetaXYt_B,2);
-	
-//	Float_t thetaDiffFactor_A = pow(thetaE_A,2)-pow(thetaXYt_A,2);
-//	Float_t thetaDiffFactor_B = pow(thetaE_B,2)-pow(thetaXYt_B,2);
+//
+////	Float_t thetaDiffFactor_A = pow(thetaE_A,2)-pow(thetaXYt_A,2);
+////	Float_t thetaDiffFactor_B = pow(thetaE_B,2)-pow(thetaXYt_B,2);
+//
+////	if(thetaDiffFactor_A<thetaDiffFactor_B) return thetaE_A;
+////	else return thetaE_B;
+////	if(thetaDiffFactor_A<thetaDiffFactor_B) return thetaXYt_A;
+////	else return thetaXYt_B;
+//
+//	if(thetaDiffFactor_A<thetaDiffFactor_B) return (thetaE_A+thetaXYt_A)/2;
+//	else return (thetaE_B+thetaXYt_B)/2;
+//
+//////	try ignoring thetaXYt and and just apply max energy selectrion to thetaE - doesn't have anything in 70-90
+////if(ene1>ComptonEdge) return thetaE_B; // Check that largest energy isn't greater than Compton edge
+////else return thetaE_A;
+//}
 
-	Float_t thetaDiffFactor_A = TMath::Abs(thetaE_A/thetaXYt_A-1);
-	Float_t thetaDiffFactor_B = TMath::Abs(thetaE_B/thetaXYt_B-1);
-	
-//	if(thetaDiffFactor_A<thetaDiffFactor_B) return thetaE_A;
-//	else return thetaE_B;
-//	if(thetaDiffFactor_A<thetaDiffFactor_B) return thetaXYt_A;
-//	else return thetaXYt_B;
+// This method seems to be better!
+Float_t getBestTheta(const Float_t eneRef, const Float_t ene1, const Float_t ene2, const Int_t am, const Float_t x1, const Float_t x2, const Float_t y1, const Float_t y2, const Float_t t1, const Float_t t2)
+{
 
-	if(thetaDiffFactor_A<thetaDiffFactor_B) return (thetaE_A+thetaXYt_A)/2;
-	else return (thetaE_B+thetaXYt_B)/2;
+	Float_t cosThetaE_A = getCosThetaFromEnergy(eneRef,ene1);
+	Float_t cosThetaE_B = getCosThetaFromEnergy(eneRef,ene2);
+	Float_t cosThetaXYt_A = getCosThetaAngleFromHitsXYt(am,x2,x1,y2,y1,t2,t1);
+	Float_t cosThetaXYt_B = getCosThetaAngleFromHitsXYt(am,x1,x2,y1,y2,t1,t2);
 
-////	try ignoring thetaXYt and and just apply max energy selectrion to thetaE - doesn't have anything in 70-90
-//if(ene1>ComptonEdge) return thetaE_B; // Check that largest energy isn't greater than Compton edge
-//else return thetaE_A;
+	Float_t dF_E_A = TMath::Abs(-eneRef/(eneRef-ene1)*0.05);
+	Float_t dF_E_B = TMath::Abs(-eneRef/(eneRef-ene2)*0.05);
+//	cout << "cosThetaE_A: " << cosThetaE_A << " +/- " << dF_E_A << ", i.e. " << TMath::Abs(dF_E_A/cosThetaE_A*100) << "% (energyA=" << ene1 << ")" << endl;
+//	cout << "cosThetaE_B: " << cosThetaE_B << " +/- " << dF_E_B << ", i.e. " << TMath::Abs(dF_E_B/cosThetaE_B*100) << "% (energyB=" << ene2 << ")" << endl;
+
+	Float_t dF_XYt_A = TMath::Abs(getCosThetaAngleFromHitsXYt(am,x2,x1+0.5,y2,y1,t2,t1)-cosThetaXYt_A);
+	Float_t dF_XYt_B = TMath::Abs(getCosThetaAngleFromHitsXYt(am,x1,x2+0.5,y1,y2,t1,t2)-cosThetaXYt_B);
+//	cout << "cosThetaXYt_A: " << cosThetaXYt_A << " +/- " << dF_XYt_A << ", i.e. " << TMath::Abs(dF_XYt_A/cosThetaXYt_A*100) << "% (x2-x1=" << x2-x1 << ")" << endl;
+//	cout << "cosThetaXYt_B: " << cosThetaXYt_B << " +/- " << dF_XYt_B << ", i.e. " << TMath::Abs(dF_XYt_B/cosThetaXYt_B*100) << "% (x1-x2=" << x1-x2 << ")" << endl;
+
+//	Float_t cosThetaXYt_A = 180 - thetaXYt_B;
+
+//	Float_t thetaDiffFactor_A = TMath::Abs(thetaE_A/thetaXYt_A-1);
+//	Float_t thetaDiffFactor_B = TMath::Abs(thetaE_B/thetaXYt_B-1);
+
+// sigma weighted Chi2 calc
+	Float_t diffFactor_A = pow(cosThetaE_A-cosThetaXYt_A,2)/(pow(dF_E_A,2)+pow(dF_XYt_A,2));
+	Float_t diffFactor_B = pow(cosThetaE_B-cosThetaXYt_B,2)/(pow(dF_E_B,2)+pow(dF_XYt_B,2));
+// unweighted Chi2 calc
+//	Float_t diffFactor_A = pow(cosThetaE_A-cosThetaXYt_A,2);
+//	Float_t diffFactor_B = pow(cosThetaE_B-cosThetaXYt_B,2);
+
+//	cout << cosThetaE_A << " " << cosThetaXYt_A << " " << diffFactor_A << " " << TMath::ACos((cosThetaE_A+cosThetaXYt_A)/2)*TMath::RadToDeg() << endl << "	" << cosThetaE_B << " " << cosThetaXYt_B << " " << diffFactor_B << " " << TMath::ACos((cosThetaE_B+cosThetaXYt_B)/2)*TMath::RadToDeg() << endl;
+
+// No weighting
+//	if(ene1>ComptonEdge) return TMath::ACos((cosThetaE_B+cosThetaXYt_B)/2)*TMath::RadToDeg(); // Check that largest energy isn't greater than Compton edge
+//	if(diffFactor_A<diffFactor_B) return TMath::ACos((cosThetaE_A+cosThetaXYt_A)/2)*TMath::RadToDeg();
+//	else return TMath::ACos((cosThetaE_B+cosThetaXYt_B)/2)*TMath::RadToDeg();
+// Weighted by sigma - pretty sure this is wrong
+//	if(diffFactor_A<diffFactor_B) return TMath::ACos((cosThetaE_A*dF_E_A+cosThetaXYt_A*dF_XYt_A)/(dF_E_A+dF_XYt_A))*TMath::RadToDeg();
+//	else return TMath::ACos((cosThetaE_B*dF_E_B+cosThetaXYt_B*dF_XYt_B)/(dF_E_B+dF_XYt_B))*TMath::RadToDeg();
+// Should weight based on 1/sigma, i.e. small errors get bigger weighting
+	if(ene1>ComptonEdge) return TMath::ACos((cosThetaE_B/dF_E_B+cosThetaXYt_B/dF_XYt_B)/(1/dF_E_B+1/dF_XYt_B))*TMath::RadToDeg();
+	if(diffFactor_A<diffFactor_B) return TMath::ACos((cosThetaE_A/dF_E_A+cosThetaXYt_A/dF_XYt_A)/(1/dF_E_A+1/dF_XYt_A))*TMath::RadToDeg();
+	else return TMath::ACos((cosThetaE_B/dF_E_B+cosThetaXYt_B/dF_XYt_B)/(1/dF_E_B+1/dF_XYt_B))*TMath::RadToDeg();
 }

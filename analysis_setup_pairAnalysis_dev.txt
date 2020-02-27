@@ -56,15 +56,15 @@ E2window4PhiAnalysis_max = 540
 EtotWindow4PhiAnalysis_min = 960
 EtotWindow4PhiAnalysis_max = 1080
 // AM0
-Theta1WindowFor4PhiAnalysis_min = 70
+Theta1WindowFor4PhiAnalysis_min = 90
 Theta1WindowFor4PhiAnalysis_max = 110
-theta1Best4PhiAnalysis_min = 70
-theta1Best4PhiAnalysis_max = 110
+theta1Best4PhiAnalysis_min = 65
+theta1Best4PhiAnalysis_max = 95
 // AM1
-Theta2WindowFor4PhiAnalysis_min = 70
+Theta2WindowFor4PhiAnalysis_min = 90
 Theta2WindowFor4PhiAnalysis_max = 110
-theta2Best4PhiAnalysis_min = 70
-theta2Best4PhiAnalysis_max = 110
+theta2Best4PhiAnalysis_min = 65
+theta2Best4PhiAnalysis_max = 95
 // This means that if the theta window cut values above are not identical, then they could be applied on either head and not specifically to AM0 or AM1
 makeAsymmetricThetaWindow = 0
 makeCosineFit = 0

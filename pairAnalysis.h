@@ -108,6 +108,8 @@ Float_t relativePhiAngle = 90;
 Float_t Ewindow4PhiAnalysis_min[2] = {530,530};
 Float_t Ewindow4PhiAnalysis_max[2] = {530,530};
 
+Float_t AMcoords[2][3] = {{0,0,-80},{0,0,80}};
+
 Float_t Theta1WindowFor4PhiAnalysis_min = 60;
 Float_t Theta1WindowFor4PhiAnalysis_max = 90;
 Float_t Theta2WindowFor4PhiAnalysis_min = 60;
