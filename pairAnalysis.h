@@ -44,7 +44,7 @@ ofstream logfile;
 
 TString pathRoot = "./";
 
-const TString ver = "dev";
+const TString ver = "v13";
 const TString setup_file = "analysis_setup_pairAnalysis_" + ver + ".txt";
 
 const TString fname = "data";
