@@ -434,7 +434,8 @@ const Double_t MAC[nMAC] = {19.3,10.67,6.542,3.019,1.671,0.6071,0.3246,0.1628,0.
 TH1F * prob_h1;
 TH1F * prob2_h1;
 
-TFile *hfile;//hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+TFile *hfile1;//hfile1 = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+TFile *hfile2;//hfile1 = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
 TTree* tree = new TTree("tree","Output events tree");
 
 int main()
@@ -782,7 +783,8 @@ int main()
 	prob2_h1->SetDirectory(0);
 	f_ref->Close();
 	
-	hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+	hfile1 = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+	hfile2 = new TFile(Form("%s%s/studentOutput.root",pathRoot.Data(),subdir.Data()),"recreate");
 //	tree->Branch("dPhi",&dPh,"dPhi/F");
 //	tree->Branch("theta0",&theta0,"theta0/F");
 //	tree->Branch("theta1",&theta1,"theta1/F");
@@ -2861,7 +2863,7 @@ int main()
 	if (totalTimeElapced >= 3600) cout << Form("Total running time is %dh:%dm:%.0fs",Int_t(totalTimeElapced/3600),Int_t((totalTimeElapced - Int_t(totalTimeElapced/3600)*3600)/60),
 		totalTimeElapced - Int_t(totalTimeElapced/3600)*3600 - Int_t((totalTimeElapced - Int_t(totalTimeElapced/3600)*3600)/60)*60) << endl;
 	
-	hfile->cd();
+	hfile1->cd();
 	for (Int_t im = 0; im < nAMs; im++)
 	{
 		cathodeSpecAllEvents[im]->Write();
@@ -2994,8 +2996,11 @@ int main()
 	comptonSummedSpec2ClustersSelEventsCorr->Write();
 	comptonSummedSpec2ClustersSelEvents2Heads->Write();
 	theta0_theta1_FromFirstClusterE->Write();
+
+	hfile1->Close();
+	hfile2->cd();
 	tree->Write();
-	hfile->Close();
+	hfile2->Close();
 }
 
 Bool_t analyseNextEvent(const Int_t ievent)
