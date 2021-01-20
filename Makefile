@@ -10,19 +10,19 @@ ROOTLIBFLAGS = $(shell root-config --glibs)
 
 SOURCES = $(wildcard *.cpp)
 
-EXEC1 = pairAnalysis_v11
+EXEC1 = pairAnalysis_test
 
 .PHONY: all clean $(EXEC1) 
 
 all: $(EXEC1) 
 	@echo done.
 
-$(EXEC1): pairAnalysis_v11.o
+$(EXEC1): pairAnalysis_test.o
 	@echo linking $@...
 	@$(CC) -o $@ $^ $(LDFLAGS) $(ROOTLIBFLAGS)
 
 
-pairAnalysis_v11.o: *.cpp
+pairAnalysis_test.o: *.cpp
 	@echo compiling $(notdir $<)...
 	@$(CC) -o $@ -c $^ $(CXXFLAGS) $(ROOTINCLUDEFLAGS)
 
