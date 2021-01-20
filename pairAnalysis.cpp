@@ -440,6 +440,14 @@ const Double_t MAC[nMAC] = {19.3,10.67,6.542,3.019,1.671,0.6071,0.3246,0.1628,0.
 TH1F * prob_h1;
 TH1F * prob2_h1;
 
+Float_t dPh, theta0, theta1, sum2clE0, sum2clE1;
+Bool_t EnergyWindowCut;
+Bool_t thetaWindowCut;
+Bool_t energyCut;
+TFile *hfile;//hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+TTree* tree = new TTree("tree","Output events tree");
+//tree->Branch("dPhi",&dPh,"dPhi/F");
+
 int main()
 {
 	if (!readAnalysisSetupFile("./" + setup_file))
@@ -784,9 +792,18 @@ int main()
 	prob2_h1->SetName("prob2_h1");
 	prob2_h1->SetDirectory(0);
 	f_ref->Close();
-	
-	TFile *hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
-	
+
+ 	hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+//	TFile *hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+//	TTree* tree = new TTree("tree","Output events tree");
+	tree->Branch("dPhi",&dPh,"dPhi/F");
+	tree->Branch("theta0",&theta0,"theta0/F");
+	tree->Branch("theta1",&theta1,"theta1/F");
+	tree->Branch("energy0",&sum2clE0,"energy0/F");
+	tree->Branch("energy1",&sum2clE1,"energy1/F");
+	tree->Branch("thetaCut",&thetaWindowCut,"thetaCut/O");
+	tree->Branch("energyCut",&EnergyWindowCut,"energyCut/O");
+
 	image = new TH2F("image","Event image",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
 	image->GetXaxis()->SetTitle("Pixel number");
 	image->GetXaxis()->SetTitleOffset(1.2);
@@ -3003,7 +3020,9 @@ int main()
 	comptonSummedSpec2ClustersSelEvents2Heads->Write();
 	theta0_theta1_FromFirstClusterE->Write();
    theta0_theta1_FromFirstClusterE_Ewin->Write();
+	tree->Write();
 	hfile->Close();
+
 }
 
 Bool_t analyseNextEvent(const Int_t ievent)
@@ -3081,8 +3100,10 @@ Bool_t analyseNextEvent(const Int_t ievent)
 		secondComptonClusterSize[1]->Fill(buffClusterArea[1][secondClusterIdx[1]]);
 		
 		Float_t initialE1 = getScatteredEnergyFromAngle(Na22Energy, angleOfSecondHead);
-		Float_t sum2clE0 = buffClusterE[0][firstClusterIdx[0]]+buffClusterE[0][secondClusterIdx[0]];
-		Float_t sum2clE1 = buffClusterE[1][firstClusterIdx[1]]+buffClusterE[1][secondClusterIdx[1]];
+//		Float_t sum2clE0 = buffClusterE[0][firstClusterIdx[0]]+buffClusterE[0][secondClusterIdx[0]];
+//		Float_t sum2clE1 = buffClusterE[1][firstClusterIdx[1]]+buffClusterE[1][secondClusterIdx[1]];
+		sum2clE0 = buffClusterE[0][firstClusterIdx[0]]+buffClusterE[0][secondClusterIdx[0]];
+		sum2clE1 = buffClusterE[1][firstClusterIdx[1]]+buffClusterE[1][secondClusterIdx[1]];
 		
 		sortClusters(0);
 		Float_t xcentre = 6, ycentre = 17;
@@ -3147,8 +3168,10 @@ Bool_t analyseNextEvent(const Int_t ievent)
 				cathodeSpecSelPairs[0]->Fill(cathodeE[0]);
 				cathodeSpecSelPairs[1]->Fill(cathodeE[1]);
 			}
-			Float_t theta0 = getThetaFromEnergy(Na22Energy, buffClusterE[0][firstClusterIdx[0]]);
-			Float_t theta1 = getThetaFromEnergy(initialE1, buffClusterE[1][firstClusterIdx[1]]);
+//			Float_t theta0 = getThetaFromEnergy(Na22Energy, buffClusterE[0][firstClusterIdx[0]]);
+//			Float_t theta1 = getThetaFromEnergy(initialE1, buffClusterE[1][firstClusterIdx[1]]);
+			theta0 = getThetaFromEnergy(Na22Energy, buffClusterE[0][firstClusterIdx[0]]);
+			theta1 = getThetaFromEnergy(initialE1, buffClusterE[1][firstClusterIdx[1]]);
 			Float_t theta0a = getThetaFromEnergy(Na22Energy, buffClusterE[0][secondClusterIdx[0]]);
 			Float_t theta1a = getThetaFromEnergy(initialE1, buffClusterE[1][secondClusterIdx[1]]);
 			
@@ -3158,7 +3181,8 @@ Bool_t analyseNextEvent(const Int_t ievent)
 			Float_t theta1_xyt = 180 - theta1a_xyt;
 			
 			phiAngleCorr->Fill(phiAng0,phiAng1mirrored_shifted);
-			Float_t dPh = phiAng0-phiAng1mirrored_shifted;
+//			Float_t dPh = phiAng0-phiAng1mirrored_shifted;
+			dPh = phiAng0-phiAng1mirrored_shifted;
 			if (dPh > 180) dPh = 360 - dPh;
 			if (dPh < -180) dPh = -360 - dPh;
 			if (makeTimingCalibrationStuff && buffClusterX[0].size() == 2 && buffClusterX[1].size() == 2)
@@ -3189,7 +3213,8 @@ Bool_t analyseNextEvent(const Int_t ievent)
 			if (cathodeE[0] > maxCathodeEnergy || cathodeE[1] > maxCathodeEnergy) skipEvent_cathode = kTRUE;
 		
 			// true is good
-			Bool_t thetaWindowCut = kTRUE;
+//			Bool_t thetaWindowCut = kTRUE;
+			thetaWindowCut = kTRUE;
 			if (makeAsymmetricThetaWindow)
 			{
 				if (!((theta0 > Theta1WindowFor4PhiAnalyis_min && theta0 < Theta1WindowFor4PhiAnalyis_max && theta1 > Theta2WindowFor4PhiAnalyis_min && theta1 < Theta2WindowFor4PhiAnalyis_max)
@@ -3215,7 +3240,8 @@ Bool_t analyseNextEvent(const Int_t ievent)
 				if (theta1_xyt <= Theta2WindowFor4PhiAnalyis_min || theta1_xyt >= Theta2WindowFor4PhiAnalyis_max) thetaXYtWindowCut = kFALSE;
 			}
 		
-			Bool_t EnergyWindowCut = kTRUE;
+//			Bool_t EnergyWindowCut = kTRUE;
+			EnergyWindowCut = kTRUE;
 			if (sum2clE0 <= Ewindow4PhiAnalysis_min[0] || sum2clE0 >= Ewindow4PhiAnalysis_max[0]) EnergyWindowCut = kFALSE;
 			if (sum2clE1 <= Ewindow4PhiAnalysis_min[1] || sum2clE1 >= Ewindow4PhiAnalysis_max[1]) EnergyWindowCut = kFALSE;
 		
@@ -3366,6 +3392,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 				} // End of EnergyWindowCut
             theta0_theta1_FromFirstClusterE->Fill(theta0,theta1);
 			}
+			tree->Fill();
 		}
 		comptonSummedSpec2ClustersCorr->Fill(sum2clE0,sum2clE1);
 		comptonSummedSpec2Clusters2Heads->Fill(sum2clE0+sum2clE1);
