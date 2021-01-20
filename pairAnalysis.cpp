@@ -434,6 +434,9 @@ const Double_t MAC[nMAC] = {19.3,10.67,6.542,3.019,1.671,0.6071,0.3246,0.1628,0.
 TH1F * prob_h1;
 TH1F * prob2_h1;
 
+TFile *hfile;//hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+TTree* tree = new TTree("tree","Output events tree");
+
 int main()
 {
 	if (!readAnalysisSetupFile("./" + setup_file))
@@ -779,7 +782,14 @@ int main()
 	prob2_h1->SetDirectory(0);
 	f_ref->Close();
 	
-	TFile *hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+	hfile = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+//	tree->Branch("dPhi",&dPh,"dPhi/F");
+//	tree->Branch("theta0",&theta0,"theta0/F");
+//	tree->Branch("theta1",&theta1,"theta1/F");
+//	tree->Branch("energy0",&sum2clE0,"energy0/F");
+//	tree->Branch("energy1",&sum2clE1,"energy1/F");
+//	tree->Branch("thetaCut",&thetaWindowCut,"thetaCut/O");
+//	tree->Branch("energyCut",&EnergyWindowCut,"energyCut/O");
 	
 	image = new TH2F("image","Event image",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
 	image->GetXaxis()->SetTitle("Pixel number");
@@ -2984,6 +2994,7 @@ int main()
 	comptonSummedSpec2ClustersSelEventsCorr->Write();
 	comptonSummedSpec2ClustersSelEvents2Heads->Write();
 	theta0_theta1_FromFirstClusterE->Write();
+	tree->Write();
 	hfile->Close();
 }
 
@@ -3202,7 +3213,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 		
 			if (!skipEvent_cathode)
 			{
-				if (thetaWindowCut) 
+				if (thetaWindowCut) // These are good events, that fill dPhi plot etc.
 				{
 					comptonSummedSpec2ClustersSelEventsCorr->Fill(sum2clE0,sum2clE1);
 					comptonSummedSpec2ClustersSelEvents2Heads->Fill(sum2clE0+sum2clE1);
@@ -3344,9 +3355,10 @@ Bool_t analyseNextEvent(const Int_t ievent)
 					if (theta1a_xyt > 60) thetaFromXYtClusterE_dPhi_w[1]->Fill(theta1a_xyt,dPh,www2a);					
 					
 					theta0_theta1_FromFirstClusterE->Fill(theta0,theta1);
-				}
-			}
-		}
+				} // end of: if (EnergyWindowCut)
+				tree->Fill();
+			} // end of: if (!skipEvent_cathode)
+		} // end of: if (phi0_valid && phi1_valid)
 		comptonSummedSpec2ClustersCorr->Fill(sum2clE0,sum2clE1);
 		comptonSummedSpec2Clusters2Heads->Fill(sum2clE0+sum2clE1);
 	}
