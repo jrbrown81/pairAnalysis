@@ -699,18 +699,18 @@ int main()
 		}
 	}
 	
-	TString subdir = "Pair analysis " + ver;
-	subdir = Form("%s pixType%d",subdir.Data(),typeOfPixelsToUse);
-	if (useOnlyTriggeredPixelsInCluster) subdir += " onlyTrigPixels";
+	TString subdir = "Pair_analysis_" + ver;
+	subdir = Form("%s_pixType%d",subdir.Data(),typeOfPixelsToUse);
+	if (useOnlyTriggeredPixelsInCluster) subdir += "_onlyTrigPixels";
 	if (minClusterSize4PairAnalysis > 0 && maxClusterSize4PairAnalysis > 0)
 	{
-		if (minClusterSize4PairAnalysis == maxClusterSize4PairAnalysis) subdir += Form(" %d-pixCls",minClusterSize4PairAnalysis);
-		if (minClusterSize4PairAnalysis < maxClusterSize4PairAnalysis) subdir += Form(" %d-%d-pixCls",minClusterSize4PairAnalysis,maxClusterSize4PairAnalysis);
+		if (minClusterSize4PairAnalysis == maxClusterSize4PairAnalysis) subdir += Form("_%d-pixCls",minClusterSize4PairAnalysis);
+		if (minClusterSize4PairAnalysis < maxClusterSize4PairAnalysis) subdir += Form("_%d-%d-pixCls",minClusterSize4PairAnalysis,maxClusterSize4PairAnalysis);
 	}
 	if (minNClusters4PairAnalysis > 0 && maxNClusters4PairAnalysis > 0)
 	{
-		if (minNClusters4PairAnalysis == maxNClusters4PairAnalysis) subdir += Form(" %d-nCls",minNClusters4PairAnalysis);
-		if (minNClusters4PairAnalysis < maxNClusters4PairAnalysis) subdir += Form(" %d-%d-nCls",minNClusters4PairAnalysis,maxNClusters4PairAnalysis);
+		if (minNClusters4PairAnalysis == maxNClusters4PairAnalysis) subdir += Form("_%d-nCls",minNClusters4PairAnalysis);
+		if (minNClusters4PairAnalysis < maxNClusters4PairAnalysis) subdir += Form("_%d-%d-nCls",minNClusters4PairAnalysis,maxNClusters4PairAnalysis);
 	}
 	TString outputPathPairs = Form("%s%s/pairAnalysis",pathRoot.Data(),subdir.Data());
 	if (subdir.Length() > 1)
