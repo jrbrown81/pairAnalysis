@@ -438,6 +438,11 @@ TFile *hfile1;//hfile1 = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdi
 TFile *hfile2;//hfile1 = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
 TTree* tree = new TTree("tree","Output events tree");
 
+Float_t E1_a,E1_b,E2_a,E2_b;
+Float_t X1_a,X1_b,X2_a,X2_b;
+Float_t Y1_a,Y1_b,Y2_a,Y2_b;
+Float_t dZ1,dZ2;
+
 int main()
 {
 	if (!readAnalysisSetupFile("./" + setup_file))
@@ -785,13 +790,20 @@ int main()
 	
 	hfile1 = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
 	hfile2 = new TFile(Form("%s%s/studentOutput.root",pathRoot.Data(),subdir.Data()),"recreate");
-//	tree->Branch("dPhi",&dPh,"dPhi/F");
-//	tree->Branch("theta0",&theta0,"theta0/F");
-//	tree->Branch("theta1",&theta1,"theta1/F");
-//	tree->Branch("energy0",&sum2clE0,"energy0/F");
-//	tree->Branch("energy1",&sum2clE1,"energy1/F");
-//	tree->Branch("thetaCut",&thetaWindowCut,"thetaCut/O");
-//	tree->Branch("energyCut",&EnergyWindowCut,"energyCut/O");
+	tree->Branch("X1_a",&X1_a,"X1_a/F");
+	tree->Branch("Y1_a",&Y1_a,"Y1_a/F");
+	tree->Branch("E1_a",&E1_a,"E1_a/F");
+	tree->Branch("X1_b",&X1_b,"X1_b/F");
+	tree->Branch("Y1_b",&Y1_b,"Y1_b/F");
+	tree->Branch("E1_b",&E1_b,"E1_b/F");
+	tree->Branch("dZ1",&dZ1,"dZ1/F");
+	tree->Branch("X2_a",&X2_a,"X2_a/F");
+	tree->Branch("Y2_a",&Y2_a,"Y2_a/F");
+	tree->Branch("E2_a",&E2_a,"E2_a/F");
+	tree->Branch("X2_b",&X2_b,"X2_b/F");
+	tree->Branch("Y2_b",&Y2_b,"Y2_b/F");
+	tree->Branch("E2_b",&E2_b,"E2_b/F");
+	tree->Branch("dZ2",&dZ2,"dZ2/F");
 	
 	image = new TH2F("image","Event image",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
 	image->GetXaxis()->SetTitle("Pixel number");
@@ -812,7 +824,7 @@ int main()
 		TSystemFile *file;
 		TIter next(files);
 		cout << "Counting valid root files in " << pathRoot << " ... ";
-		while (file=(TSystemFile*)next())
+		while ((file=(TSystemFile*)next()))
 		{
 			fname2do = file->GetName();
 			if (file->IsDirectory()) files->Remove(file);
@@ -821,7 +833,7 @@ int main()
 		}
 		next.Reset();
 		cout << "List of files to read:" << endl;
-		while (file=(TSystemFile*)next())
+		while ((file=(TSystemFile*)next()))
 		{
 			fname2do = file->GetName();
 			Nfiles++;
@@ -833,7 +845,7 @@ int main()
 			return kFALSE;
 		}
 		cout << "Total of " << Nfiles << " files found." << endl;
-		while (file=(TSystemFile*)next())
+		while ((file=(TSystemFile*)next()))
 		{
 			fname2do = pathRoot + file->GetName();
 			cout << "Reading file:" << endl;
@@ -3361,12 +3373,28 @@ Bool_t analyseNextEvent(const Int_t ievent)
 					
 					theta0_theta1_FromFirstClusterE->Fill(theta0,theta1);
 				} // end of: if (EnergyWindowCut)
-				tree->Fill();
 			} // end of: if (!skipEvent_cathode)
 		} // end of: if (phi0_valid && phi1_valid)
 		comptonSummedSpec2ClustersCorr->Fill(sum2clE0,sum2clE1);
 		comptonSummedSpec2Clusters2Heads->Fill(sum2clE0+sum2clE1);
-	}
+
+// energies and positions to be output to studentOutput tree
+		X1_a=(buffClusterX[0][firstClusterIdx[0]]-5.5)*pixelPitch; // convert to real (mm) local coordinates
+		Y1_a=(buffClusterY[0][firstClusterIdx[0]]-16.5)*pixelPitch;
+		E1_a=buffClusterE[0][firstClusterIdx[0]];
+		X1_b=(buffClusterX[0][secondClusterIdx[0]]-5.5)*pixelPitch;
+		Y1_b=(buffClusterY[0][secondClusterIdx[0]]-16.5)*pixelPitch;
+		E1_b=buffClusterE[0][secondClusterIdx[0]];
+		dZ1=(buffClusterAnodeTiming[0][firstClusterIdx[0]]-buffClusterAnodeTiming[0][secondClusterIdx[0]])/factor2ConvertAnodeTime2Distance[0];
+		X2_a=(buffClusterX[1][firstClusterIdx[1]]-5.5)*pixelPitch;
+		Y2_a=(buffClusterY[1][firstClusterIdx[1]]-16.5)*pixelPitch;
+		E2_a=buffClusterE[1][firstClusterIdx[1]];
+		X2_b=(buffClusterX[1][secondClusterIdx[1]]-5.5)*pixelPitch;
+		Y2_b=(buffClusterY[1][secondClusterIdx[1]]-16.5)*pixelPitch;
+		E2_b=buffClusterE[1][secondClusterIdx[1]];
+		dZ2=(buffClusterAnodeTiming[1][firstClusterIdx[1]]-buffClusterAnodeTiming[1][secondClusterIdx[1]])/factor2ConvertAnodeTime2Distance[1];
+		tree->Fill();
+	} // end of: 	if (buffClusterX[0].size() >= 2 && buffClusterX[1].size() >= 2 && !skipEvent), i.e. >=2 clusters per head, and valid pixels
 
 	Float_t tEE1 = buffClusterE[0][firstClusterIdx[0]]+buffClusterE[0][secondClusterIdx[0]];
 	Float_t tEE2 = buffClusterE[1][firstClusterIdx[1]]+buffClusterE[1][secondClusterIdx[1]];
@@ -3503,6 +3531,7 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 	lastAMTreeEventIdx[AM2do] = 0;
 
 	//cout << Form("========Start==AM%d===event %d=====",AM2do,evt) << endl;
+	// Find the first entry in tree2_AM0 or 1 corresponding to the event in tree2_events
 	for (Int_t ii = 0; ii < Nev[AM2do] && event[AM2do] != evt; ii++)
 	{
 		cntEntryTree[AM2do]++;
@@ -3515,6 +3544,7 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 			break;
 		}
 	}
+	// Loop over tree2_AM0 or 1 to fill vectors with hits from this event
 	while (event[AM2do] == evt && cntEntryTree[AM2do] <= Nev[AM2do])
 	{
 		if (pixel[AM2do] >= firstPixel && pixel[AM2do] <= lastPixel)
@@ -3565,21 +3595,22 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 		}
 		cntEntryTree[AM2do]++;
 		chain1p[AM2do]->GetEntry(cntEntryTree[AM2do]);
-	}
+	} // end of loop over tree2_AM0 or 1
 	cntEntryTree[AM2do]--;
 	chain1p[AM2do]->GetEntry(cntEntryTree[AM2do]);
 	lastAMTreeEventIdx[AM2do] = cntEntryTree[AM2do];
 	if (!status) return status;
 	Int_t clusterCounter = 0;
-	Bool_t skipFrame = kFALSE;
-	Float_t primaryClusterE = 0;
-	Float_t E1 = -1, E2 = -1;
-	Float_t xc1 = -1, yc1 = -1;
-	Float_t xc2 = -1, yc2 = -1;
+	Bool_t skipFrame = kFALSE; // Skip very large clusters
+	Float_t primaryClusterE = 0; // not used
+	Float_t E1 = -1, E2 = -1; // not used
+	Float_t xc1 = -1, yc1 = -1; // not used
+	Float_t xc2 = -1, yc2 = -1; // not used
 	Float_t aTime;
-	for (Int_t ii = 0; ii < nPixXY&&(!skipFrame); ii++)
+	// Loop over all pixels
+	for (Int_t ii = 0; ii < nPixXY&&(!skipFrame); ii++) // Loop over rows, x
 	{
-		for (Int_t jj = 0; jj < nPixXY&&(!skipFrame); jj++)
+		for (Int_t jj = 0; jj < nPixXY&&(!skipFrame); jj++) // Loop over columns, y
 		{
 			if (matrix_flags[ii][jj] != newNeighbourFlag) continue;
 			buffClusterXarr.clear();
@@ -3794,6 +3825,7 @@ Bool_t analyseAM(const Int_t evt, const Int_t AM2do)
 		}
 		if (clusterCounter == 1) clusterSpec_1ClusterEvents_summed[AM2do]->Fill(buffClusterEloc[0]);
 		if (!clusterSizesGood || !goodNClusters || hasSplitClisters) return kFALSE;
+// Reorder buffers, largest to smallest
 		Int_t niter = 0;
 		while (niter < buffClusterXloc.size())
 		{
@@ -4700,7 +4732,7 @@ Double_t fitfun(Double_t *x, Double_t *par)
 	return par[0]*TMath::Cos(2*x[0]*TMath::DegToRad()-TMath::Pi())+par[1];
 }
 
-void sortClusters(const Int_t am)
+void sortClusters(const Int_t am) // This is a dummmy function as clusters are now sorted directly within analyseAM
 {
 	firstClusterIdx[am] = 0;
 	secondClusterIdx[am] = 1;
@@ -4865,7 +4897,8 @@ void updateClustersWithNeighboursEnergy(const Int_t am, const Int_t eve2)
 		if (buffClusterArealoc[ia] == 2) clusterSummingStats2PixClusters[am]->Fill(nbAdded[ia]);
 	}
 	
-	delete arr, idx;
+	delete[] arr;
+	delete[] idx;
 }
 
 Double_t fitMAC(Double_t *x, Double_t *par)
