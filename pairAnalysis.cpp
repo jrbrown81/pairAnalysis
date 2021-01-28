@@ -434,14 +434,16 @@ const Double_t MAC[nMAC] = {19.3,10.67,6.542,3.019,1.671,0.6071,0.3246,0.1628,0.
 TH1F * prob_h1;
 TH1F * prob2_h1;
 
-TFile *hfile1;//hfile1 = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
-TFile *hfile2;//hfile1 = new TFile(Form("%s%s/histos.root",pathRoot.Data(),subdir.Data()),"recreate");
+TFile *hfile1;
+TFile *hfile2;
 TTree* tree = new TTree("tree","Output events tree");
 
 Float_t E1_a,E1_b,E2_a,E2_b;
 Float_t X1_a,X1_b,X2_a,X2_b;
 Float_t Y1_a,Y1_b,Y2_a,Y2_b;
 Float_t dZ1,dZ2;
+
+ofstream outfile;
 
 int main()
 {
@@ -804,6 +806,9 @@ int main()
 	tree->Branch("Y2_b",&Y2_b,"Y2_b/F");
 	tree->Branch("E2_b",&E2_b,"E2_b/F");
 	tree->Branch("dZ2",&dZ2,"dZ2/F");
+	
+	outfile.open(Form("%s%s/studentOutput.csv",pathRoot.Data(),subdir.Data()));
+	outfile << "X1_a, Y1_a, E1_a, X1_b, Y1_b, E1_b, dZ1, X2_a, Y2_a, E2_a, X2_b, Y2_b, E2_b, dZ2" << endl;
 	
 	image = new TH2F("image","Event image",nPixXY,0,nPixXY,nPixXY,0,nPixXY);
 	image->GetXaxis()->SetTitle("Pixel number");
@@ -3013,6 +3018,7 @@ int main()
 	hfile2->cd();
 	tree->Write();
 	hfile2->Close();
+	outfile.close();
 }
 
 Bool_t analyseNextEvent(const Int_t ievent)
@@ -3394,6 +3400,7 @@ Bool_t analyseNextEvent(const Int_t ievent)
 		E2_b=buffClusterE[1][secondClusterIdx[1]];
 		dZ2=(buffClusterAnodeTiming[1][firstClusterIdx[1]]-buffClusterAnodeTiming[1][secondClusterIdx[1]])/factor2ConvertAnodeTime2Distance[1];
 		tree->Fill();
+		outfile << X1_a << ", " << Y1_a << ", " << E1_a << ", " << X1_b << ", " << Y1_b << ", " << E1_b << ", " << dZ1 << ", " << X2_a << ", " << Y2_a << ", " << E2_a << ", " << X2_b << ", " << Y2_b << ", " << E2_b << ", " << dZ2 << endl;
 	} // end of: 	if (buffClusterX[0].size() >= 2 && buffClusterX[1].size() >= 2 && !skipEvent), i.e. >=2 clusters per head, and valid pixels
 
 	Float_t tEE1 = buffClusterE[0][firstClusterIdx[0]]+buffClusterE[0][secondClusterIdx[0]];
