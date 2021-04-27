@@ -1,0 +1,5 @@
+Compiles on research2 using:
+Ubuntu/16.04, gcc/5.4.0, geant/4.10.1.p03 and ROOT/6.16.00
+
+J. Brown
+27/4/21
